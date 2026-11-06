@@ -23,8 +23,16 @@ class Config:
         return not self.admin_ids or user_id in self.admin_ids
 
 
-def _int_list(raw: str) -> list[int]:
-    return [int(x) for x in raw.replace(" ", "").split(",") if x]
+def _int_list(raw: str, variable: str) -> list[int]:
+    """«123, 456» → [123, 456]. Кавычки и пробелы прощаем, остальное — понятная ошибка."""
+    items = [x.strip().strip("\"'") for x in raw.strip().strip("\"'").split(",")]
+    try:
+        return [int(x) for x in items if x]
+    except ValueError:
+        raise SystemExit(
+            f"{variable} в .env записан неправильно: «{raw}». Нужны числа через запятую, "
+            f"например {variable}=123456789,987654321"
+        )
 
 
 def load_config() -> Config:
@@ -38,14 +46,14 @@ def load_config() -> Config:
     rank_penalties = os.getenv("ROLE_PENALTIES", "").strip()
     off_role = os.getenv("OFF_ROLE_PENALTY", "").strip()
     weights = Weights(
-        rank_penalties=tuple(_int_list(rank_penalties)) if rank_penalties else defaults.rank_penalties,
+        rank_penalties=tuple(_int_list(rank_penalties, "ROLE_PENALTIES")) if rank_penalties else defaults.rank_penalties,
         off_role_penalty=int(off_role) if off_role else defaults.off_role_penalty,
     )
 
     return Config(
         bot_token=token,
         db_path=os.getenv("DB_PATH", "data/bot.sqlite3"),
-        admin_ids=frozenset(_int_list(os.getenv("ADMIN_IDS", ""))),
+        admin_ids=frozenset(_int_list(os.getenv("ADMIN_IDS", ""), "ADMIN_IDS")),
         weights=weights,
         reshuffle_tolerance=int(os.getenv("RESHUFFLE_TOLERANCE", "200")),
     )
