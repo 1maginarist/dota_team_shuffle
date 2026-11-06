@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    container_name: dota-team-shuffle
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
