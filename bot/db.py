@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS drafts (
     bench       TEXT    NOT NULL,              -- JSON: кто на скамейке
     seen        TEXT    NOT NULL DEFAULT '[]', -- JSON: уже показанные разбиения
     lineup      TEXT    NOT NULL,              -- JSON: текущий состав
+    dm_messages TEXT    NOT NULL DEFAULT '{}', -- JSON: {участник: id сообщения с составом в личке}
     status      TEXT    NOT NULL DEFAULT 'draft', -- draft | confirmed | stale
     created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,7 +58,7 @@ CREATE TABLE IF NOT EXISTS captain_drafts (
     show_all    INTEGER NOT NULL DEFAULT 0,
     captains    TEXT    NOT NULL DEFAULT '[]',     -- JSON: [кто выбирает первым, второй]
     picks       TEXT    NOT NULL DEFAULT '[]',     -- JSON: выбранные игроки по порядку
-    dm_messages TEXT    NOT NULL DEFAULT '{}',     -- JSON: {капитан: id сообщения в личке}
+    dm_messages TEXT    NOT NULL DEFAULT '{}',     -- JSON: {участник: [id сообщения в личке, был ли там его ход]}
     created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -103,6 +104,7 @@ class Draft:
     seen: list[str]
     lineup: Lineup
     status: str
+    dm_messages: dict[int, int] = field(default_factory=dict)  # участник → id сообщения в личке
 
 
 @dataclass
@@ -116,7 +118,7 @@ class CaptainDraft:
     show_all: bool
     captains: list[int]
     picks: list[int]
-    dm_messages: dict[int, list[int]]  # капитан → [id сообщения в личке, был ли там его ход]
+    dm_messages: dict[int, list[int]]  # участник → [id сообщения в личке, был ли там его ход]
 
 
 _CAPTAIN_DRAFT_JSON = ("selected", "captains", "picks", "dm_messages")
@@ -165,6 +167,7 @@ def _draft(row: aiosqlite.Row) -> Draft:
         seen=json.loads(row["seen"]),
         lineup=Lineup.from_dict(json.loads(row["lineup"])),
         status=row["status"],
+        dm_messages={int(k): v for k, v in json.loads(row["dm_messages"] or "{}").items()},
     )
 
 
@@ -180,7 +183,15 @@ class Database:
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.executescript(SCHEMA)
+        # Миграции для баз, созданных старыми версиями бота.
+        await self._ensure_column("drafts", "dm_messages", "TEXT NOT NULL DEFAULT '{}'")
         await self._conn.commit()
+
+    async def _ensure_column(self, table: str, column: str, ddl: str) -> None:
+        async with self.conn.execute(f"PRAGMA table_info({table})") as cur:
+            columns = {row["name"] for row in await cur.fetchall()}
+        if column not in columns:
+            await self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
     async def close(self) -> None:
         if self._conn is not None:
@@ -317,6 +328,10 @@ class Database:
         async with self.conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)) as cur:
             row = await cur.fetchone()
         return _draft(row) if row else None
+
+    async def set_draft_dms(self, draft_id: int, dm_messages: dict[int, int]) -> None:
+        await self.conn.execute("UPDATE drafts SET dm_messages = ? WHERE id = ?", (json.dumps(dm_messages), draft_id))
+        await self.conn.commit()
 
     async def update_draft_lineup(self, draft_id: int, lineup: Lineup, seen: list[str]) -> None:
         await self.conn.execute(

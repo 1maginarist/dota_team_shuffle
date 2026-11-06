@@ -186,6 +186,16 @@ def board_text(draft: CaptainDraft, players: dict[int, PlayerRow], weights) -> s
     return "\n".join(lines)
 
 
+def participant_dm_text(draft: CaptainDraft, players: dict[int, PlayerRow], weights) -> str:
+    """Живая доска для участника, который не капитан: видно, кто кого выбирает."""
+    board = board_text(draft, players, weights)
+    if draft.stage == "picking":
+        return "👀 <b>Ты участвуешь в Immortal Draft</b> — тут видно, кто кого выбирает. Сообщение обновляется само.\n\n" + board
+    if draft.stage == "done":
+        return "⏳ Драфт закончен — ждём, пока организатор утвердит составы.\n\n" + board
+    return board
+
+
 def captain_dm_text(draft: CaptainDraft, players: dict[int, PlayerRow], weights, captain_id: int) -> str:
     board = board_text(draft, players, weights)
     if draft.stage == "picking":

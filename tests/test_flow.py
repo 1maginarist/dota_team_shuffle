@@ -9,7 +9,14 @@ from datetime import datetime
 
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import AnswerCallbackQuery, EditMessageText, GetMe, SendMessage, TelegramMethod
+from aiogram.methods import (
+    AnswerCallbackQuery,
+    DeleteMessage,
+    EditMessageText,
+    GetMe,
+    SendMessage,
+    TelegramMethod,
+)
 from aiogram.types import CallbackQuery, Chat, Message, Update, User
 
 from bot.__main__ import build_dispatcher
@@ -160,18 +167,30 @@ async def full_flow(h):
     assert len(picker.selected) == 11 and 12 not in picker.selected
     assert "5 на 5, ещё 1 на скамейку" in h.last_text(GROUP_ID)
 
-    # Распределяем
+    # Распределяем — каждый участник сразу получает ту же расстановку в личку
+    before = len(h.session.calls)
     await h.press(1, PickCb(picker_id=picker_id, action="go"), chat_id=GROUP_ID)
     draft = await h.db.get_draft(1)
     assert len(draft.players) == 10 and len(draft.bench) == 1
     text = h.last_text(GROUP_ID)
     assert "Свет" in text and "Тьма" in text and "Скамейка" in text
+    previews = [c for c in h.session.calls[before:] if isinstance(c, SendMessage) and c.chat_id > 0]
+    assert sorted(m.chat_id for m in previews) == sorted(draft.players + draft.bench)
+    assert all("Предварительный состав" in m.text and "Свет" in m.text and "Тьма" in m.text for m in previews)
+    assert "Пока ты на скамейке" in next(m.text for m in previews if m.chat_id == draft.bench[0])
+    assert sorted(draft.dm_messages) == sorted(draft.players + draft.bench)
 
-    # Другой вариант
+    # Другой вариант — у участников правится то же сообщение, без новых уведомлений
+    before = len(h.session.calls)
     await h.press(1, DraftCb(draft_id=1, action="again"), chat_id=GROUP_ID)
     draft2 = await h.db.get_draft(1)
     assert draft2.lineup.key != draft.lineup.key
     assert "вариант 2" in h.last_text(GROUP_ID)
+    new = h.session.calls[before:]
+    assert not [c for c in new if isinstance(c, SendMessage) and c.chat_id > 0]
+    edited = [c for c in new if isinstance(c, EditMessageText) and c.chat_id > 0]
+    assert sorted(c.chat_id for c in edited) == sorted(draft.players + draft.bench)
+    assert all("вариант 2" in c.text for c in edited)
 
     # Утверждаем → всем в личку
     before = len(h.session.of(SendMessage))
@@ -179,6 +198,10 @@ async def full_flow(h):
     assert "Состав утверждён" in h.last_text(GROUP_ID)
     dms = [m for m in h.session.of(SendMessage)[before:] if m.chat_id > 0]
     assert len(dms) == 11
+    assert all("Состав утверждён" in m.text and "Свет" in m.text and "Тьма" in m.text for m in dms)
+    # Предварительные сообщения убраны — у каждого одно итоговое
+    deleted = [c for c in h.session.calls if isinstance(c, DeleteMessage)]
+    assert sorted(c.chat_id for c in deleted) == sorted(draft.players + draft.bench)
     benched = draft2.bench[0]
     assert any(m.chat_id == benched and "скамейке" in m.text for m in dms)
     player_dm = next(m for m in dms if m.chat_id == draft2.players[0])

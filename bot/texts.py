@@ -161,3 +161,12 @@ def personal(result: Lineup, user_id: int) -> str | None:
 
 
 BENCH_PERSONAL = "🪑 В этот раз ты на скамейке. В следующей игре играешь в приоритете."
+
+
+def preview_personal(result: Lineup, user_id: int) -> str:
+    found = result.find(user_id)
+    head = "📋 <b>Предварительный состав</b> — организатор ещё может перемешать, сообщение обновится само."
+    if found is None:
+        return f"{head}\n🪑 Пока ты на скамейке."
+    team_index, position = found
+    return f"{head}\nСейчас ты за {TEAM_NAMES_ACC[team_index]}, позиция {position} — <b>{POSITION_NAMES[position]}</b>."

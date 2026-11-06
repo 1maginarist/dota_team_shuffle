@@ -57,34 +57,41 @@ async def _sync(bot: Bot, db: Database, config: Config, draft: CaptainDraft) -> 
         await _edit(bot, draft.chat_id, draft.message_id,
                     cd.board_text(draft, players, config.weights), cd.board_kb(draft, players, shown))
 
-    if draft.stage in ("select", "captains"):
+    # «Утверждён» — финальные сообщения уже разосланы в _confirm.
+    if draft.stage in ("select", "captains", "confirmed"):
         return
     changed = False
-    for captain in draft.captains:
-        if captain == draft.chat_id:
+    for uid in draft.selected:
+        if uid == draft.chat_id:
             continue  # общее сообщение и так у него в личке
-        is_turn = cd.current_captain(draft) == captain
-        text = cd.captain_dm_text(draft, players, config.weights, captain)
-        markup = cd.captain_dm_kb(draft, players, captain)
-        message_id, had_turn = draft.dm_messages.get(captain, [0, 0])
+        captain = uid in draft.captains
+        is_turn = cd.current_captain(draft) == uid
+        if captain:
+            text = cd.captain_dm_text(draft, players, config.weights, uid)
+            markup = cd.captain_dm_kb(draft, players, uid)
+        else:
+            text, markup = cd.participant_dm_text(draft, players, config.weights), None
+        message_id, had_turn = draft.dm_messages.get(uid, [0, 0])
         if message_id == -1:
-            continue  # капитан не открывал бота — пусть выбирает в общем сообщении
+            continue  # не открывал бота — пусть смотрит общее сообщение
         if message_id and not (is_turn and not had_turn):
-            await _edit(bot, captain, message_id, text, markup)
-            draft.dm_messages[captain] = [message_id, int(is_turn)]
+            await _edit(bot, uid, message_id, text, markup)
+            draft.dm_messages[uid] = [message_id, int(is_turn)]
             continue
-        # Ход перешёл к капитану — новым сообщением, чтобы пришло уведомление.
+        if draft.stage == "cancelled":
+            continue  # тем, кому ещё ничего не слали, об отмене писать незачем
+        # Первое сообщение или ход перешёл к капитану — новым сообщением, чтобы пришло уведомление.
         if message_id:
             try:
-                await bot.delete_message(captain, message_id)
+                await bot.delete_message(uid, message_id)
             except TelegramAPIError:
                 pass
         try:
-            sent = await bot.send_message(captain, text, reply_markup=markup)
-            draft.dm_messages[captain] = [sent.message_id, int(is_turn)]
+            sent = await bot.send_message(uid, text, reply_markup=markup)
+            draft.dm_messages[uid] = [sent.message_id, int(is_turn)]
         except TelegramAPIError as exc:
-            log.warning("Не могу написать капитану %s: %s", captain, exc)
-            draft.dm_messages[captain] = [-1, 0]
+            log.warning("Не могу написать участнику %s: %s", uid, exc)
+            draft.dm_messages[uid] = [-1, 0]
         changed = True
     if changed:
         await db.save_captain_draft(draft)
@@ -225,6 +232,14 @@ async def _confirm(call: CallbackQuery, db: Database, config: Config, bot: Bot, 
     players = await db.get_players(everyone)
     lineup = cd.final_lineup(draft, players, config.weights)
     full = cd.board_text(draft, players, config.weights)
+    # Живые доски заменяем финальным сообщением — новым, чтобы пришло уведомление.
+    for uid, (message_id, _) in draft.dm_messages.items():
+        if message_id > 0:
+            try:
+                await bot.delete_message(uid, message_id)
+            except TelegramAPIError:
+                pass
+    draft.dm_messages = {}
     delivered = 0
     for uid in everyone:
         if uid == draft.chat_id:

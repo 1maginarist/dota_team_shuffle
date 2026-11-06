@@ -46,6 +46,44 @@ async def _draft_text(db: Database, draft: Draft, footer: str = "") -> str:
     return text + (f"\n\n{footer}" if footer else "")
 
 
+def _participants(draft: Draft) -> list[int]:
+    """Кому слать состав в личку: игроки и скамейка, кроме чата, где и так открыто меню."""
+    return [uid for uid in draft.players + draft.bench if uid != draft.chat_id]
+
+
+async def _send_previews(bot: Bot, db: Database, draft: Draft) -> None:
+    """Сразу после «Распределить» каждый участник видит ту же расстановку, что и организатор."""
+    full = await _draft_text(db, draft)
+    sent: dict[int, int] = {}
+    for uid in _participants(draft):
+        try:
+            message = await bot.send_message(uid, f"{texts.preview_personal(draft.lineup, uid)}\n\n{full}")
+            sent[uid] = message.message_id
+        except TelegramAPIError as exc:
+            log.warning("Не удалось написать игроку %s: %s", uid, exc)
+    await db.set_draft_dms(draft.id, sent)
+
+
+async def _update_previews(bot: Bot, db: Database, draft: Draft) -> None:
+    """«Другой вариант» — правим те же сообщения, без новых уведомлений."""
+    full = await _draft_text(db, draft)
+    for uid, message_id in draft.dm_messages.items():
+        try:
+            await bot.edit_message_text(
+                f"{texts.preview_personal(draft.lineup, uid)}\n\n{full}", chat_id=uid, message_id=message_id
+            )
+        except TelegramAPIError:
+            pass  # не изменилось или игрок удалил сообщение
+
+
+async def _delete_previews(bot: Bot, draft: Draft) -> None:
+    for uid, message_id in draft.dm_messages.items():
+        try:
+            await bot.delete_message(uid, message_id)
+        except TelegramAPIError:
+            pass
+
+
 @router.message(Command("game", "sbor"))
 async def cmd_game(message: Message, db: Database, config: Config) -> None:
     user = message.from_user
@@ -115,7 +153,10 @@ async def _build(call: CallbackQuery, db: Database, config: Config, bot: Bot, pi
 
     # Старые черновики из этого меню больше не актуальны.
     for old in await db.open_drafts(picker.id):
-        if await db.change_draft_status(old.id, "stale") and old.message_id:
+        if not await db.change_draft_status(old.id, "stale"):
+            continue
+        await _delete_previews(bot, old)  # участникам сейчас придёт новый состав
+        if old.message_id:
             try:
                 await bot.edit_message_text(
                     await _draft_text(db, old, "<i>⏳ Неактуально: ниже собран новый состав.</i>"),
@@ -132,6 +173,7 @@ async def _build(call: CallbackQuery, db: Database, config: Config, bot: Bot, pi
     draft = await db.get_draft(draft_id)
     sent = await call.message.answer(await _draft_text(db, draft), reply_markup=draft_kb(draft_id))
     await db.set_draft_message(draft_id, sent.message_id)
+    await _send_previews(bot, db, draft)
     await call.answer()
 
 
@@ -149,12 +191,12 @@ async def on_draft(call: CallbackQuery, callback_data: DraftCb, db: Database, co
         return
 
     if callback_data.action == "again":
-        await _reshuffle(call, db, config, draft)
+        await _reshuffle(call, db, config, bot, draft)
     elif callback_data.action == "ok":
         await _confirm(call, db, bot, draft)
 
 
-async def _reshuffle(call: CallbackQuery, db: Database, config: Config, draft: Draft) -> None:
+async def _reshuffle(call: CallbackQuery, db: Database, config: Config, bot: Bot, draft: Draft) -> None:
     rows = await db.get_players(draft.players)
     players = [rows[uid].to_player() for uid in draft.players if uid in rows and rows[uid].is_complete]
     lineup = balance(players, config.weights, exclude=draft.seen, tolerance=config.reshuffle_tolerance)
@@ -169,6 +211,7 @@ async def _reshuffle(call: CallbackQuery, db: Database, config: Config, draft: D
         await call.message.edit_text(await _draft_text(db, draft), reply_markup=draft_kb(draft.id))
     except TelegramBadRequest:
         pass
+    await _update_previews(bot, db, draft)
     await call.answer()
 
 
@@ -181,13 +224,15 @@ async def _confirm(call: CallbackQuery, db: Database, bot: Bot, draft: Draft) ->
     full = await _draft_text(db, draft)
     await call.message.edit_text(full + "\n\n✅ <b>Состав утверждён</b>", reply_markup=None)
 
-    # Каждому игроку в личку — его команда и позиция.
-    recipients = [uid for uid in draft.players + draft.bench if uid != call.message.chat.id]
+    # Предварительные сообщения заменяем финальным — новым, чтобы пришло уведомление.
+    await _delete_previews(bot, draft)
+    await db.set_draft_dms(draft.id, {})
+    recipients = _participants(draft)
     delivered, failed = 0, []
     for uid in recipients:
         intro = texts.personal(draft.lineup, uid) or texts.BENCH_PERSONAL
         try:
-            await bot.send_message(uid, f"{intro}\n\n{full}")
+            await bot.send_message(uid, f"{intro}\n\n{full}\n\n✅ <b>Состав утверждён</b>")
             delivered += 1
         except TelegramAPIError as exc:
             log.warning("Не удалось написать игроку %s: %s", uid, exc)

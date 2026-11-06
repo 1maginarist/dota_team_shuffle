@@ -108,9 +108,13 @@ def test_full_draft_in_group():
         assert d.stage == "picking" and sorted(d.captains) == sorted(expected)
         first, second = d.captains
         dms = [c for c in h.session.calls[before:] if isinstance(c, SendMessage)]
-        assert {m.chat_id for m in dms} == {first, second}
+        # Живая доска в личке у всех 10 участников, у капитанов — со своим статусом
+        assert sorted(m.chat_id for m in dms) == sorted(d.selected)
         assert "Твой ход" in next(m.text for m in dms if m.chat_id == first)
         assert "соперник" in next(m.text for m in dms if m.chat_id == second)
+        watchers = [m for m in dms if m.chat_id not in d.captains]
+        assert len(watchers) == 8 and all("Ты участвуешь в Immortal Draft" in m.text for m in watchers)
+        assert all(m.reply_markup is None for m in watchers)
         assert "пик 1/8" in h.last_text(GROUP_ID) and "Свободные игроки" in h.last_text(GROUP_ID)
 
         # Чужой капитан не может пикнуть не в свой ход
@@ -124,6 +128,11 @@ def test_full_draft_in_group():
         new = h.session.calls[before:]
         assert any(isinstance(c, SendMessage) and c.chat_id == second and "Твой ход" in c.text for c in new)
         assert any(isinstance(c, DeleteMessage) and c.chat_id == second for c in new)
+
+        # Участники видят пик у себя в личке (правка, без нового уведомления)
+        watcher = next(uid for uid in d.selected if uid not in d.captains and uid != pool[0])
+        edits = [c for c in new if isinstance(c, EditMessageText) and c.chat_id == watcher]
+        assert edits and "пик 2/8" in edits[-1].text
 
         # Уже забранного игрока взять нельзя
         await press(second, "pick", pool[0], chat_id=second)
@@ -153,8 +162,12 @@ def test_full_draft_in_group():
         before = len(h.session.calls)
         await press(1, "ok")
         assert "Состав утверждён" in h.last_text(GROUP_ID)
-        personal = [c for c in h.session.calls[before:] if isinstance(c, SendMessage) and "Ты за" in c.text]
+        after = h.session.calls[before:]
+        personal = [c for c in after if isinstance(c, SendMessage) and "Ты за" in c.text]
         assert sorted(m.chat_id for m in personal) == sorted(d.selected)
+        assert all("составы готовы" in m.text and "Состав утверждён" in m.text for m in personal)
+        # Живые доски убраны, чтобы у каждого осталось одно итоговое сообщение
+        assert sorted(c.chat_id for c in after if isinstance(c, DeleteMessage)) == sorted(d.selected)
         await press(1, "cancel")
         assert "уже закончен" in h.last_alert()
 
@@ -178,12 +191,16 @@ def test_cancel_and_organizer_in_private_chat():
             await h.press(1, cd.CaptainDraftCb(draft_id=1, action="start"))
             d = await h.db.get_captain_draft(1)
             dms = [c for c in h.session.calls[before:] if isinstance(c, SendMessage)]
-            assert [m.chat_id for m in dms] == [2]  # только второму капитану
+            # Всем участникам, кроме организатора: у него доска и так в личке
+            assert sorted(m.chat_id for m in dms) == sorted(uid for uid in d.selected if uid != 1)
             await h.press(1, cd.CaptainDraftCb(draft_id=1, action="cancel"))
             assert (await h.db.get_captain_draft(1)).stage == "cancelled"
             assert "Драфт отменён" in h.last_text(1)
-            edits = [c for c in h.session.calls if isinstance(c, EditMessageText) and c.chat_id == 2]
-            assert edits and "Драфт отменён" in edits[-1].text
+            for uid in d.selected:
+                if uid == 1:
+                    continue
+                edits = [c for c in h.session.calls if isinstance(c, EditMessageText) and c.chat_id == uid]
+                assert edits and "Драфт отменён" in edits[-1].text
             assert d.captains and sorted(d.captains) == [1, 2]
         finally:
             await h.db.close()
