@@ -18,7 +18,8 @@ from aiogram.types import (
 
 from .config import Config, load_config
 from .db import Database
-from .handlers import organizer, profile
+from .handlers import mvp, organizer, profile
+from .opendota import OpenDota
 
 log = logging.getLogger("bot")
 
@@ -39,10 +40,10 @@ class RefreshNameMiddleware(BaseMiddleware):
         return await handler(event, data)
 
 
-def build_dispatcher(db: Database, config: Config) -> Dispatcher:
-    dp = Dispatcher(db=db, config=config)
+def build_dispatcher(db: Database, config: Config, opendota: OpenDota | None = None) -> Dispatcher:
+    dp = Dispatcher(db=db, config=config, opendota=opendota or OpenDota(config.opendota_api_key))
     dp.update.outer_middleware(RefreshNameMiddleware())
-    dp.include_routers(profile.router, organizer.router, profile.fallback)
+    dp.include_routers(profile.router, organizer.router, mvp.router, profile.fallback)
     return dp
 
 
@@ -56,6 +57,7 @@ async def set_commands(bot: Bot) -> None:
         BotCommand(command="offline", description="Я не играю — скрыть меня"),
         BotCommand(command="game", description="Собрать игру (организатор)"),
         BotCommand(command="players", description="Все игроки"),
+        BotCommand(command="mvp", description="MVP вечера: /mvp id1 id2 id3"),
         BotCommand(command="help", description="Как это работает"),
     ]
     group = [
@@ -63,6 +65,7 @@ async def set_commands(bot: Bot) -> None:
         BotCommand(command="players", description="Все игроки"),
         BotCommand(command="online", description="Я играю"),
         BotCommand(command="offline", description="Я не играю"),
+        BotCommand(command="mvp", description="MVP вечера: /mvp id1 id2 id3"),
         BotCommand(command="help", description="Как это работает"),
     ]
     await bot.set_my_commands(private, scope=BotCommandScopeAllPrivateChats())
@@ -107,6 +110,7 @@ async def main() -> None:
         await connect(bot)
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
+        await dp["opendota"].close()
         await db.close()
         await bot.session.close()
 

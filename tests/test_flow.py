@@ -35,12 +35,13 @@ class FakeSession(BaseSession):
         if isinstance(method, (SendMessage, EditMessageText)):
             chat_id = method.chat_id
             chat_type = "private" if chat_id and chat_id > 0 else "group"
+            # Как настоящий aiogram: ответ привязан к боту, у него работают .edit_text() и т.п.
             return Message(
                 message_id=getattr(method, "message_id", None) or next(self._ids),
                 date=datetime.now(),
                 chat=Chat(id=chat_id or 0, type=chat_type),
                 text=method.text,
-            )
+            ).as_(bot)
         return True
 
     async def close(self):
@@ -219,6 +220,79 @@ def test_group_redirects_profile_to_private():
         try:
             await h.text(3, "/start", chat_id=GROUP_ID)
             assert "t.me/shuffle_bot" in h.last_text(GROUP_ID)
+        finally:
+            await h.db.close()
+
+    asyncio.run(scenario())
+
+
+# --- /mvp -------------------------------------------------------------------
+
+import copy  # noqa: E402
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from bot.handlers import mvp as mvp_handler  # noqa: E402
+
+FIXTURES = Path(__file__).parent / "fixtures" / "opendota"
+
+
+class FakeOpenDota:
+    """OpenDota без сети: один матч сначала не разобран и «разбирается» после запроса."""
+
+    def __init__(self, unparsed_id=None):
+        self.matches = {int(f.stem): json.loads(f.read_text()) for f in FIXTURES.glob("*.json")}
+        self.unparsed_id = unparsed_id
+        self.parse_requests = []
+
+    async def match(self, match_id):
+        data = self.matches.get(match_id)
+        if data is None:
+            return None
+        if match_id == self.unparsed_id:
+            data = copy.deepcopy(data)
+            data["version"] = None
+        return data
+
+    async def request_parse(self, match_id):
+        self.parse_requests.append(match_id)
+        return 777
+
+    async def job_finished(self, job_id):
+        self.unparsed_id = None  # реплей разобран
+        return True
+
+    async def heroes(self):
+        return {}
+
+    async def close(self):
+        pass
+
+
+def test_mvp_command(monkeypatch):
+    monkeypatch.setattr(mvp_handler, "POLL_INTERVAL", 0.01)
+
+    async def scenario():
+        h = Harness(admin_ids=frozenset({1}))
+        await h.db.connect()
+        fake = FakeOpenDota(unparsed_id=9077267013)
+        h.dp = build_dispatcher(h.db, h.config, opendota=fake)
+        try:
+            await h.text(2, "/mvp 9077341933")
+            assert "только организаторы" in h.last_text(2)
+
+            await h.text(1, "/mvp")
+            assert "Пришли номера матчей" in h.last_text(1)
+
+            await h.text(1, "/mvp https://www.dotabuff.com/matches/9077341933 9077497263, 9077267013 123456789")
+            assert fake.parse_requests == [9077267013, 123456789]
+            texts = [c.text for c in h.session.calls if isinstance(c, (SendMessage, EditMessageText)) and c.chat_id == 1]
+            assert any("разбираю реплей" in t for t in texts)
+            summary, details = texts[-2], texts[-1]
+            assert "MVP вечера" in summary
+            assert "Матч 123456789 не найден" in summary
+            assert "без разбора" not in summary  # третий матч дождались
+            assert "Разбор лидеров" in details
         finally:
             await h.db.close()
 

@@ -18,6 +18,8 @@ class Config:
     # «Другой вариант» выбирает случайно среди вариантов, которые хуже
     # лучшего не больше чем на столько (в ММР-эквиваленте).
     reshuffle_tolerance: int
+    # Ключ OpenDota необязателен: без него лимит ~2000 запросов в день, нам хватает.
+    opendota_api_key: str | None = None
 
     def can_organize(self, user_id: int) -> bool:
         return not self.admin_ids or user_id in self.admin_ids
@@ -56,4 +58,5 @@ def load_config() -> Config:
         admin_ids=frozenset(_int_list(os.getenv("ADMIN_IDS", ""), "ADMIN_IDS")),
         weights=weights,
         reshuffle_tolerance=int(os.getenv("RESHUFFLE_TOLERANCE", "200")),
+        opendota_api_key=os.getenv("OPENDOTA_API_KEY", "").strip() or None,
     )

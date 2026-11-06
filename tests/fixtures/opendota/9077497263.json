@@ -1,0 +1,706 @@
+{
+ "match_id": 9077497263,
+ "duration": 2892,
+ "radiant_win": false,
+ "start_time": 1793897665,
+ "version": 22,
+ "players": [
+  {
+   "account_id": 418942836,
+   "personaname": "rin",
+   "hero_id": 53,
+   "isRadiant": true,
+   "player_slot": 0,
+   "position_est": 1,
+   "net_worth": 31089,
+   "gold_per_min": 789,
+   "kills": 12,
+   "deaths": 5,
+   "assists": 4,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 789,
+     "pct": 0.8581
+    },
+    "xp_per_min": {
+     "raw": 641,
+     "pct": 0.4387
+    },
+    "kills_per_min": {
+     "raw": 0.249,
+     "pct": 0.6602
+    },
+    "deaths_per_min": {
+     "raw": 0.1037,
+     "pct": 0.8853
+    },
+    "assists_per_min": {
+     "raw": 0.083,
+     "pct": 0.0301
+    },
+    "last_hits_per_min": {
+     "raw": 15.083,
+     "pct": 0.9871
+    },
+    "denies_per_min": {
+     "raw": 0.1867,
+     "pct": 0.6514
+    },
+    "hero_damage_per_min": {
+     "raw": 992.1577,
+     "pct": 0.8248
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.8072
+    },
+    "tower_damage": {
+     "raw": 4299,
+     "pct": 0.4965
+    }
+   },
+   "obs_placed": 0,
+   "sen_placed": 0,
+   "observer_kills": 0,
+   "sentry_kills": 0,
+   "camps_stacked": 1,
+   "stuns": 0,
+   "teamfight_participation": 0.64,
+   "damage_taken": {
+    "npc_dota_hero_bounty_hunter": 413,
+    "npc_dota_hero_ursa": 7560,
+    "npc_dota_hero_witch_doctor": 6397,
+    "npc_dota_hero_dragon_knight": 10758,
+    "npc_dota_hero_slark": 216
+   }
+  },
+  {
+   "account_id": 1202267677,
+   "personaname": "災禍~",
+   "hero_id": 50,
+   "isRadiant": true,
+   "player_slot": 1,
+   "position_est": 5,
+   "net_worth": 7941,
+   "gold_per_min": 277,
+   "kills": 2,
+   "deaths": 7,
+   "assists": 11,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 277,
+     "pct": 0.2878
+    },
+    "xp_per_min": {
+     "raw": 326,
+     "pct": 0.1138
+    },
+    "kills_per_min": {
+     "raw": 0.0415,
+     "pct": 0.2727
+    },
+    "deaths_per_min": {
+     "raw": 0.1452,
+     "pct": 0.7674
+    },
+    "assists_per_min": {
+     "raw": 0.2282,
+     "pct": 0.1217
+    },
+    "last_hits_per_min": {
+     "raw": 0.8299,
+     "pct": 0.199
+    },
+    "denies_per_min": {
+     "raw": 0.0415,
+     "pct": 0.3572
+    },
+    "hero_damage_per_min": {
+     "raw": 111.3693,
+     "pct": 0.0279
+    },
+    "hero_healing_per_min": {
+     "raw": 202.3237,
+     "pct": 0.3157
+    },
+    "tower_damage": {
+     "raw": 135,
+     "pct": 0.3629
+    }
+   },
+   "obs_placed": 10,
+   "sen_placed": 26,
+   "observer_kills": 1,
+   "sentry_kills": 5,
+   "camps_stacked": 7,
+   "stuns": 7.6669188,
+   "teamfight_participation": 0.48,
+   "damage_taken": {
+    "npc_dota_hero_bounty_hunter": 1069,
+    "npc_dota_hero_ursa": 4111,
+    "npc_dota_hero_dazzle": 8183,
+    "npc_dota_hero_witch_doctor": 1336,
+    "npc_dota_hero_dragon_knight": 3829,
+    "npc_dota_hero_slark": 5805
+   }
+  },
+  {
+   "account_id": 860145568,
+   "personaname": "Merlin",
+   "hero_id": 16,
+   "isRadiant": true,
+   "player_slot": 2,
+   "position_est": 2,
+   "net_worth": 16453,
+   "gold_per_min": 451,
+   "kills": 6,
+   "deaths": 9,
+   "assists": 10,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 451,
+     "pct": 0.3807
+    },
+    "xp_per_min": {
+     "raw": 530,
+     "pct": 0.2378
+    },
+    "kills_per_min": {
+     "raw": 0.1245,
+     "pct": 0.3157
+    },
+    "deaths_per_min": {
+     "raw": 0.1867,
+     "pct": 0.5697
+    },
+    "assists_per_min": {
+     "raw": 0.2075,
+     "pct": 0.1959
+    },
+    "last_hits_per_min": {
+     "raw": 6.8257,
+     "pct": 0.805
+    },
+    "denies_per_min": {
+     "raw": 0,
+     "pct": 0.16
+    },
+    "hero_damage_per_min": {
+     "raw": 462.4689,
+     "pct": 0.2062
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.8905
+    },
+    "tower_damage": {
+     "raw": 139,
+     "pct": 0.3884
+    }
+   },
+   "obs_placed": 2,
+   "sen_placed": 4,
+   "observer_kills": 0,
+   "sentry_kills": 3,
+   "camps_stacked": 2,
+   "stuns": 45.16531,
+   "teamfight_participation": 0.64,
+   "damage_taken": {
+    "npc_dota_hero_bounty_hunter": 1068,
+    "npc_dota_hero_ursa": 6705,
+    "npc_dota_hero_witch_doctor": 4371,
+    "npc_dota_hero_slark": 10622,
+    "npc_dota_hero_dragon_knight": 14036
+   }
+  },
+  {
+   "account_id": 333351042,
+   "personaname": "t",
+   "hero_id": 119,
+   "isRadiant": true,
+   "player_slot": 3,
+   "position_est": 4,
+   "net_worth": 8210,
+   "gold_per_min": 249,
+   "kills": 2,
+   "deaths": 11,
+   "assists": 17,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 249,
+     "pct": 0.1377
+    },
+    "xp_per_min": {
+     "raw": 443,
+     "pct": 0.3024
+    },
+    "kills_per_min": {
+     "raw": 0.0415,
+     "pct": 0.103
+    },
+    "deaths_per_min": {
+     "raw": 0.2282,
+     "pct": 0.4452
+    },
+    "assists_per_min": {
+     "raw": 0.3527,
+     "pct": 0.3886
+    },
+    "last_hits_per_min": {
+     "raw": 0.4979,
+     "pct": 0.05
+    },
+    "denies_per_min": {
+     "raw": 0.0415,
+     "pct": 0.3075
+    },
+    "hero_damage_per_min": {
+     "raw": 359.5436,
+     "pct": 0.3284
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.5849
+    },
+    "tower_damage": {
+     "raw": 0,
+     "pct": 0.2234
+    }
+   },
+   "obs_placed": 10,
+   "sen_placed": 14,
+   "observer_kills": 2,
+   "sentry_kills": 2,
+   "camps_stacked": 1,
+   "stuns": 164.69981,
+   "teamfight_participation": 0.76,
+   "damage_taken": {
+    "npc_dota_hero_bounty_hunter": 626,
+    "npc_dota_hero_witch_doctor": 2747,
+    "npc_dota_hero_ursa": 6052,
+    "npc_dota_hero_dark_willow": 150,
+    "npc_dota_hero_slark": 5707,
+    "npc_dota_hero_dragon_knight": 11416
+   }
+  },
+  {
+   "account_id": 1150772339,
+   "personaname": "⃤⃟⃝⃤⃟⃝⃤⃟⃝⃤",
+   "hero_id": 69,
+   "isRadiant": true,
+   "player_slot": 4,
+   "position_est": 3,
+   "net_worth": 19289,
+   "gold_per_min": 516,
+   "kills": 3,
+   "deaths": 6,
+   "assists": 13,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 516,
+     "pct": 0.4547
+    },
+    "xp_per_min": {
+     "raw": 573,
+     "pct": 0.3258
+    },
+    "kills_per_min": {
+     "raw": 0.0622,
+     "pct": 0.1157
+    },
+    "deaths_per_min": {
+     "raw": 0.1245,
+     "pct": 0.8229
+    },
+    "assists_per_min": {
+     "raw": 0.2697,
+     "pct": 0.347
+    },
+    "last_hits_per_min": {
+     "raw": 6.4938,
+     "pct": 0.8156
+    },
+    "denies_per_min": {
+     "raw": 0.166,
+     "pct": 0.5294
+    },
+    "hero_damage_per_min": {
+     "raw": 449.0249,
+     "pct": 0.3721
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.9048
+    },
+    "tower_damage": {
+     "raw": 0,
+     "pct": 0.2379
+    }
+   },
+   "obs_placed": 0,
+   "sen_placed": 0,
+   "observer_kills": 2,
+   "sentry_kills": 2,
+   "camps_stacked": 0,
+   "stuns": 21.697409,
+   "teamfight_participation": 0.64,
+   "damage_taken": {
+    "npc_dota_hero_bounty_hunter": 1415,
+    "npc_dota_hero_doom_bringer": 4428,
+    "npc_dota_hero_ursa": 6637,
+    "npc_dota_hero_witch_doctor": 6663,
+    "npc_dota_hero_slark": 5816,
+    "npc_dota_hero_dragon_knight": 5540
+   }
+  },
+  {
+   "account_id": 177203952,
+   "personaname": "Yuma",
+   "hero_id": 70,
+   "isRadiant": false,
+   "player_slot": 128,
+   "position_est": 1,
+   "net_worth": 38727,
+   "gold_per_min": 819,
+   "kills": 14,
+   "deaths": 3,
+   "assists": 8,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 819,
+     "pct": 0.9377
+    },
+    "xp_per_min": {
+     "raw": 1051,
+     "pct": 0.7708
+    },
+    "kills_per_min": {
+     "raw": 0.2905,
+     "pct": 0.5223
+    },
+    "deaths_per_min": {
+     "raw": 0.0622,
+     "pct": 0.9066
+    },
+    "assists_per_min": {
+     "raw": 0.166,
+     "pct": 0.3822
+    },
+    "last_hits_per_min": {
+     "raw": 10.9959,
+     "pct": 0.964
+    },
+    "denies_per_min": {
+     "raw": 0.1452,
+     "pct": 0.4031
+    },
+    "hero_damage_per_min": {
+     "raw": 644.5021,
+     "pct": 0.4262
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.9485
+    },
+    "tower_damage": {
+     "raw": 13945,
+     "pct": 0.9479
+    }
+   },
+   "obs_placed": 0,
+   "sen_placed": 0,
+   "observer_kills": 0,
+   "sentry_kills": 0,
+   "camps_stacked": 1,
+   "stuns": 20.466215,
+   "teamfight_participation": 0.57894737,
+   "damage_taken": {
+    "npc_dota_hero_sand_king": 3033,
+    "npc_dota_hero_dark_willow": 4242,
+    "npc_dota_hero_doom_bringer": 5601,
+    "npc_dota_hero_dazzle": 1381,
+    "npc_dota_hero_furion": 8821
+   }
+  },
+  {
+   "account_id": 154974246,
+   "personaname": "))",
+   "hero_id": 93,
+   "isRadiant": false,
+   "player_slot": 129,
+   "position_est": 2,
+   "net_worth": 31364,
+   "gold_per_min": 702,
+   "kills": 10,
+   "deaths": 4,
+   "assists": 14,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 702,
+     "pct": 0.9222
+    },
+    "xp_per_min": {
+     "raw": 1109,
+     "pct": 0.9056
+    },
+    "kills_per_min": {
+     "raw": 0.2075,
+     "pct": 0.4918
+    },
+    "deaths_per_min": {
+     "raw": 0.083,
+     "pct": 0.8784
+    },
+    "assists_per_min": {
+     "raw": 0.2905,
+     "pct": 0.5566
+    },
+    "last_hits_per_min": {
+     "raw": 9.5643,
+     "pct": 0.9795
+    },
+    "denies_per_min": {
+     "raw": 0.4772,
+     "pct": 0.8449
+    },
+    "hero_damage_per_min": {
+     "raw": 584.3568,
+     "pct": 0.6164
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.9693
+    },
+    "tower_damage": {
+     "raw": 203,
+     "pct": 0.2492
+    }
+   },
+   "obs_placed": 2,
+   "sen_placed": 7,
+   "observer_kills": 10,
+   "sentry_kills": 13,
+   "camps_stacked": 0,
+   "stuns": 0,
+   "teamfight_participation": 0.6315789,
+   "damage_taken": {
+    "npc_dota_hero_doom_bringer": 4482,
+    "npc_dota_hero_sand_king": 7743,
+    "npc_dota_hero_dark_willow": 1670,
+    "npc_dota_hero_dazzle": 575,
+    "npc_dota_hero_furion": 13677,
+    "npc_dota_hero_slark": 14376
+   }
+  },
+  {
+   "account_id": 191362875,
+   "personaname": "Speeed",
+   "hero_id": 30,
+   "isRadiant": false,
+   "player_slot": 130,
+   "position_est": 5,
+   "net_worth": 17604,
+   "gold_per_min": 412,
+   "kills": 4,
+   "deaths": 6,
+   "assists": 21,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 412,
+     "pct": 0.7888
+    },
+    "xp_per_min": {
+     "raw": 619,
+     "pct": 0.6982
+    },
+    "kills_per_min": {
+     "raw": 0.083,
+     "pct": 0.1209
+    },
+    "deaths_per_min": {
+     "raw": 0.1245,
+     "pct": 0.9103
+    },
+    "assists_per_min": {
+     "raw": 0.4357,
+     "pct": 0.5581
+    },
+    "last_hits_per_min": {
+     "raw": 0.4979,
+     "pct": 0.1114
+    },
+    "denies_per_min": {
+     "raw": 0.0415,
+     "pct": 0.352
+    },
+    "hero_damage_per_min": {
+     "raw": 446.3485,
+     "pct": 0.3681
+    },
+    "hero_healing_per_min": {
+     "raw": 237.8631,
+     "pct": 0.6987
+    },
+    "tower_damage": {
+     "raw": 171,
+     "pct": 0.4071
+    }
+   },
+   "obs_placed": 5,
+   "sen_placed": 15,
+   "observer_kills": 0,
+   "sentry_kills": 3,
+   "camps_stacked": 2,
+   "stuns": 37.73172,
+   "teamfight_participation": 0.65789473,
+   "damage_taken": {
+    "npc_dota_hero_dazzle": 675,
+    "npc_dota_hero_doom_bringer": 4890,
+    "npc_dota_hero_witch_doctor": 225,
+    "npc_dota_hero_sand_king": 3848,
+    "npc_dota_hero_dark_willow": 3279,
+    "npc_dota_hero_furion": 6691
+   }
+  },
+  {
+   "account_id": 160119017,
+   "personaname": "myaso",
+   "hero_id": 49,
+   "isRadiant": false,
+   "player_slot": 131,
+   "position_est": 3,
+   "net_worth": 34244,
+   "gold_per_min": 753,
+   "kills": 8,
+   "deaths": 5,
+   "assists": 18,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 753,
+     "pct": 0.9579
+    },
+    "xp_per_min": {
+     "raw": 982,
+     "pct": 0.842
+    },
+    "kills_per_min": {
+     "raw": 0.166,
+     "pct": 0.4721
+    },
+    "deaths_per_min": {
+     "raw": 0.1037,
+     "pct": 0.7841
+    },
+    "assists_per_min": {
+     "raw": 0.3734,
+     "pct": 0.5798
+    },
+    "last_hits_per_min": {
+     "raw": 11.2448,
+     "pct": 0.9839
+    },
+    "denies_per_min": {
+     "raw": 0.083,
+     "pct": 0.1488
+    },
+    "hero_damage_per_min": {
+     "raw": 941.4108,
+     "pct": 0.8381
+    },
+    "hero_healing_per_min": {
+     "raw": 0,
+     "pct": 0.9563
+    },
+    "tower_damage": {
+     "raw": 9648,
+     "pct": 0.8323
+    }
+   },
+   "obs_placed": 0,
+   "sen_placed": 0,
+   "observer_kills": 1,
+   "sentry_kills": 0,
+   "camps_stacked": 2,
+   "stuns": 66.93278,
+   "teamfight_participation": 0.68421054,
+   "damage_taken": {
+    "npc_dota_hero_sand_king": 4333,
+    "npc_dota_hero_dark_willow": 4222,
+    "npc_dota_hero_doom_bringer": 4448,
+    "npc_dota_hero_dazzle": 1943,
+    "npc_dota_hero_furion": 12660,
+    "npc_dota_hero_dragon_knight": 8330
+   }
+  },
+  {
+   "account_id": 90423751,
+   "personaname": "discovery subscription",
+   "hero_id": 62,
+   "isRadiant": false,
+   "player_slot": 132,
+   "position_est": 4,
+   "net_worth": 15487,
+   "gold_per_min": 365,
+   "kills": 2,
+   "deaths": 7,
+   "assists": 17,
+   "benchmarks": {
+    "gold_per_min": {
+     "raw": 365,
+     "pct": 0.398
+    },
+    "xp_per_min": {
+     "raw": 556,
+     "pct": 0.5072
+    },
+    "kills_per_min": {
+     "raw": 0.0415,
+     "pct": 0.1551
+    },
+    "deaths_per_min": {
+     "raw": 0.1452,
+     "pct": 0.7869
+    },
+    "assists_per_min": {
+     "raw": 0.3527,
+     "pct": 0.328
+    },
+    "last_hits_per_min": {
+     "raw": 0.1245,
+     "pct": 0.004
+    },
+    "denies_per_min": {
+     "raw": 0,
+     "pct": 0.3665
+    },
+    "hero_damage_per_min": {
+     "raw": 95.249,
+     "pct": 0.0213
+    },
+    "hero_healing_per_min": {
+     "raw": 38.7137,
+     "pct": 0.8851
+    },
+    "tower_damage": {
+     "raw": 0,
+     "pct": 0.3217
+    }
+   },
+   "obs_placed": 16,
+   "sen_placed": 16,
+   "observer_kills": 0,
+   "sentry_kills": 2,
+   "camps_stacked": 0,
+   "stuns": 23.800001,
+   "teamfight_participation": 0.5,
+   "damage_taken": {
+    "npc_dota_hero_dazzle": 794,
+    "npc_dota_hero_bounty_hunter": 150,
+    "npc_dota_hero_doom_bringer": 2282,
+    "npc_dota_hero_sand_king": 3334,
+    "npc_dota_hero_dark_willow": 3917,
+    "npc_dota_hero_furion": 5973
+   }
+  }
+ ]
+}
