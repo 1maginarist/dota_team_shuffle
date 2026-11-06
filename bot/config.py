@@ -20,6 +20,9 @@ class Config:
     reshuffle_tolerance: int
     # Ключ OpenDota необязателен: без него лимит ~2000 запросов в день, нам хватает.
     opendota_api_key: str | None = None
+    # Реплеи лобби, которые положили на сервер вручную, и адрес парсера odota/parser
+    replays_dir: str = "data/replays"
+    parser_url: str = "http://localhost:5600"
 
     def can_organize(self, user_id: int) -> bool:
         return not self.admin_ids or user_id in self.admin_ids
@@ -59,4 +62,6 @@ def load_config() -> Config:
         weights=weights,
         reshuffle_tolerance=int(os.getenv("RESHUFFLE_TOLERANCE", "200")),
         opendota_api_key=os.getenv("OPENDOTA_API_KEY", "").strip() or None,
+        replays_dir=os.getenv("REPLAYS_DIR", "data/replays"),
+        parser_url=os.getenv("PARSER_URL", "http://localhost:5600"),
     )

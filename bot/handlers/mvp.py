@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
 from aiogram.types import LinkPreviewOptions, Message
 
-from .. import mvp_texts
+from .. import mvp_texts, replay
 from ..config import Config
 from ..mvp import compute_mvp
 from ..opendota import MatchLoad, OpenDota, OpenDotaError, load_matches
@@ -43,26 +44,54 @@ async def cmd_mvp(message: Message, command: CommandObject, config: Config, open
         await message.answer(f"Не больше {MAX_MATCHES} матчей за раз.")
         return
 
-    status = await message.answer(mvp_texts.progress([MatchLoad(m) for m in match_ids], 0))
+    # Реплеи, которые положили на сервер (лобби, которых нет в OpenDota), разбираем сами.
+    folder = Path(config.replays_dir)
+    loads = {mid: MatchLoad(mid) for mid in match_ids}
+    local_ids = [mid for mid in match_ids if replay.find_replay(folder, mid)]
+    for mid in local_ids:
+        loads[mid].status = "реплей с сервера"
+    status = await message.answer(mvp_texts.progress(list(loads.values()), 0))
 
-    async def show_progress(loads: list[MatchLoad], elapsed: int) -> None:
+    async def show_progress(updated: list[MatchLoad], elapsed: int) -> None:
+        for item in updated:
+            loads[item.match_id] = item
         try:
-            await status.edit_text(mvp_texts.progress(loads, elapsed))
+            await status.edit_text(mvp_texts.progress(list(loads.values()), elapsed))
         except TelegramBadRequest:
             pass  # текст не изменился
 
-    try:
-        loaded = await load_matches(
-            opendota, match_ids, show_progress, parse_timeout=PARSE_TIMEOUT, poll_interval=POLL_INTERVAL
-        )
-    except Exception:
-        log.exception("Не удалось загрузить матчи %s", match_ids)
-        await status.edit_text("❌ Не получилось загрузить матчи из OpenDota. Попробуй ещё раз через минуту.")
-        return
+    warnings: list[str] = []
+    found: dict[int, dict] = {}
+    for mid in local_ids:
+        loads[mid].status = "разбираю файл реплея"
+        await show_progress([], 0)
+        try:
+            data = await replay.load_local(mid, folder, config.parser_url, opendota)
+            found[mid] = data
+            loads[mid].data, loads[mid].status = data, "готово"
+        except replay.ReplayError as exc:
+            loads[mid].status = "ошибка реплея"
+            warnings.append(f"Реплей {mid}: {exc}")
+        except Exception:
+            log.exception("Не удалось разобрать реплей %s", mid)
+            loads[mid].status = "ошибка реплея"
+            warnings.append(f"Реплей {mid}: не удалось разобрать, подробности в логах бота.")
 
-    warnings = list(loaded.warnings)
+    remote_ids = [mid for mid in match_ids if mid not in local_ids]
+    if remote_ids:
+        try:
+            loaded = await load_matches(
+                opendota, remote_ids, show_progress, parse_timeout=PARSE_TIMEOUT, poll_interval=POLL_INTERVAL
+            )
+        except Exception:
+            log.exception("Не удалось загрузить матчи %s", remote_ids)
+            await status.edit_text("❌ Не получилось загрузить матчи из OpenDota. Попробуй ещё раз через минуту.")
+            return
+        warnings += loaded.warnings
+        found.update({int(m["match_id"]): m for m in loaded.matches})
+
     matches = []
-    for match in loaded.matches:
+    for match in (found[mid] for mid in match_ids if mid in found):
         if (match.get("duration") or 0) <= 0:
             warnings.append(f"Матч {match.get('match_id')} пропущен: он не доигран или пустой.")
         else:

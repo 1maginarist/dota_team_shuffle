@@ -72,7 +72,8 @@ def _position(game: PlayerGame) -> str:
 
 
 def progress(loads: list[MatchLoad], elapsed: int) -> str:
-    icons = {"готово": "✅", "разбираю реплей": "🔄", "без разбора": "⚠️", "не найден": "❌", "ошибка OpenDota": "❌"}
+    icons = {"готово": "✅", "разбираю реплей": "🔄", "без разбора": "⚠️", "не найден": "❌", "ошибка OpenDota": "❌",
+             "реплей с сервера": "📼", "разбираю файл реплея": "🔄", "ошибка реплея": "❌"}
     lines = [f"⏳ <b>Считаю MVP по матчам: {len(loads)}</b>", ""]
     for i, item in enumerate(loads, start=1):
         status = item.status

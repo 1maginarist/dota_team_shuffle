@@ -4,8 +4,23 @@ services:
     container_name: dota-team-shuffle
     restart: unless-stopped
     env_file: .env
+    environment:
+      PARSER_URL: http://parser:5600
     volumes:
       - ./data:/app/data
+    depends_on:
+      - parser
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # Разбор реплеев лобби (.dem), которых нет в OpenDota. Нужно ~1 ГБ RAM во время разбора.
+  parser:
+    image: odota/parser
+    container_name: dota-replay-parser
+    restart: unless-stopped
     logging:
       driver: json-file
       options:

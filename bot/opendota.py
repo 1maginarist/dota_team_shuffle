@@ -32,6 +32,7 @@ class OpenDota:
         self.base_url = base_url.rstrip("/")
         self._session: aiohttp.ClientSession | None = None
         self._heroes: dict[int, str] | None = None
+        self._benchmarks: dict[int, dict[str, list]] = {}
 
     async def _http(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -79,6 +80,13 @@ class OpenDota:
         """OpenDota возвращает null, когда задачи разбора больше нет в очереди."""
         _, data = await self._call("GET", f"/request/{job_id}")
         return not data
+
+    async def benchmarks(self, hero_id: int) -> dict[str, list]:
+        """Таблицы перцентилей OpenDota по герою (для реплеев, которых нет в OpenDota)."""
+        if hero_id not in self._benchmarks:
+            _, data = await self._call("GET", f"/benchmarks?hero_id={hero_id}")
+            self._benchmarks[hero_id] = (data or {}).get("result") or {}
+        return self._benchmarks[hero_id]
 
     async def heroes(self) -> dict[int, str]:
         if self._heroes is None:
