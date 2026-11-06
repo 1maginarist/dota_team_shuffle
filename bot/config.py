@@ -29,7 +29,8 @@ def _int_list(raw: str) -> list[int]:
 
 def load_config() -> Config:
     load_dotenv()
-    token = os.getenv("BOT_TOKEN", "").strip()
+    # Прощаем частые ошибки ручного ввода: пробелы и кавычки вокруг токена.
+    token = os.getenv("BOT_TOKEN", "").strip().strip("\"'").strip()
     if not token:
         raise SystemExit("Не задан BOT_TOKEN. Скопируй .env.example в .env и впиши токен от @BotFather.")
 
