@@ -76,7 +76,7 @@ def profile_kb(player: PlayerRow) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def _player_button_text(player: PlayerRow, selected: bool) -> str:
+def player_button_text(player: PlayerRow, selected: bool) -> str:
     raw_name = player.name.strip() or "Без имени"
     if len(raw_name) > MAX_NAME:
         raw_name = raw_name[: MAX_NAME - 1] + "…"
@@ -90,7 +90,7 @@ def picker_kb(picker: Picker, shown: Sequence[PlayerRow]) -> InlineKeyboardMarku
     selected = set(picker.selected)
     for player in shown:
         kb.button(
-            text=_player_button_text(player, player.user_id in selected),
+            text=player_button_text(player, player.user_id in selected),
             callback_data=PickCb(picker_id=picker.id, action="toggle", user_id=player.user_id),
         )
     kb.button(text="☑️ Отметить всех онлайн", callback_data=PickCb(picker_id=picker.id, action="all"))

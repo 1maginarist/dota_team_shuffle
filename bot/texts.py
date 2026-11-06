@@ -23,6 +23,8 @@ HELP = (
     "После регистрации ты онлайн, пока сам не выключишь\n\n"
     "<b>Организатору</b>:\n"
     "• /game — открыть список онлайн-игроков, отметить, кто играет, и нажать «Распределить»\n"
+    "• /draft — Immortal Draft: отмечаешь 10 человек, выбираешь 2 капитанов, и они по очереди "
+    "(1-2-2-1-1-2-2-1) набирают себе команды\n"
     "• /players — все зарегистрированные игроки\n"
     "• /mvp id1 id2 id3 — MVP вечера по номерам матчей (как считается — /mvphelp)\n"
     "• /id — узнать свой Telegram ID (для настройки ADMIN_IDS)\n\n"
@@ -119,9 +121,10 @@ def _slot_line(position: int, player, rank: int | None) -> str:
     return head + f"{name(player.name)} · {fmt_mmr(player.mmr)}{mark}"
 
 
-def lineup(result: Lineup, bench_names: Sequence[str], variant: int) -> str:
-    lines = [f"⚔️ <b>Составы</b> · вариант {variant}", ""]
-    for title, team in zip(TEAM_TITLES, result.teams):
+def lineup(result: Lineup, bench_names: Sequence[str], variant: int, *, title: str | None = None,
+           team_titles: Sequence[str] = TEAM_TITLES) -> str:
+    lines = [title or f"⚔️ <b>Составы</b> · вариант {variant}", ""]
+    for title, team in zip(team_titles, result.teams):
         lines.append(f"{title} — Σ {fmt_mmr(team.total_mmr)} · ср. {fmt_mmr(team.avg_mmr)}")
         for slot in team.slots:
             lines.append(_slot_line(slot.position, slot.player, slot.rank))

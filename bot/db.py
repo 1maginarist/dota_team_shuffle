@@ -45,6 +45,21 @@ CREATE TABLE IF NOT EXISTS drafts (
     status      TEXT    NOT NULL DEFAULT 'draft', -- draft | confirmed | stale
     created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Immortal Draft: капитаны по очереди выбирают игроков
+CREATE TABLE IF NOT EXISTS captain_drafts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id     INTEGER NOT NULL,
+    message_id  INTEGER,
+    owner_id    INTEGER NOT NULL,
+    stage       TEXT    NOT NULL DEFAULT 'select', -- select | captains | picking | done | confirmed | cancelled
+    selected    TEXT    NOT NULL DEFAULT '[]',     -- JSON: 10 участников
+    show_all    INTEGER NOT NULL DEFAULT 0,
+    captains    TEXT    NOT NULL DEFAULT '[]',     -- JSON: [кто выбирает первым, второй]
+    picks       TEXT    NOT NULL DEFAULT '[]',     -- JSON: выбранные игроки по порядку
+    dm_messages TEXT    NOT NULL DEFAULT '{}',     -- JSON: {капитан: id сообщения в личке}
+    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -88,6 +103,38 @@ class Draft:
     seen: list[str]
     lineup: Lineup
     status: str
+
+
+@dataclass
+class CaptainDraft:
+    id: int
+    chat_id: int
+    message_id: int | None
+    owner_id: int
+    stage: str
+    selected: list[int]
+    show_all: bool
+    captains: list[int]
+    picks: list[int]
+    dm_messages: dict[int, list[int]]  # капитан → [id сообщения в личке, был ли там его ход]
+
+
+_CAPTAIN_DRAFT_JSON = ("selected", "captains", "picks", "dm_messages")
+
+
+def _captain_draft(row: aiosqlite.Row) -> CaptainDraft:
+    return CaptainDraft(
+        id=row["id"],
+        chat_id=row["chat_id"],
+        message_id=row["message_id"],
+        owner_id=row["owner_id"],
+        stage=row["stage"],
+        selected=json.loads(row["selected"]),
+        show_all=bool(row["show_all"]),
+        captains=json.loads(row["captains"]),
+        picks=json.loads(row["picks"]),
+        dm_messages={int(k): v for k, v in json.loads(row["dm_messages"]).items()},
+    )
 
 
 def _parse_roles(raw: str) -> tuple[int, ...]:
@@ -291,3 +338,33 @@ class Database:
         )
         await self.conn.commit()
         return cur.rowcount == 1
+
+    # --- Immortal Draft ----------------------------------------------------
+
+    async def create_captain_draft(self, chat_id: int, owner_id: int, selected: list[int]) -> CaptainDraft:
+        cur = await self.conn.execute(
+            "INSERT INTO captain_drafts (chat_id, owner_id, selected) VALUES (?, ?, ?)",
+            (chat_id, owner_id, json.dumps(selected)),
+        )
+        await self.conn.commit()
+        draft = await self.get_captain_draft(cur.lastrowid)
+        assert draft is not None
+        return draft
+
+    async def get_captain_draft(self, draft_id: int) -> CaptainDraft | None:
+        async with self.conn.execute("SELECT * FROM captain_drafts WHERE id = ?", (draft_id,)) as cur:
+            row = await cur.fetchone()
+        return _captain_draft(row) if row else None
+
+    async def save_captain_draft(self, draft: CaptainDraft) -> None:
+        values = {
+            "message_id": draft.message_id,
+            "stage": draft.stage,
+            "show_all": int(draft.show_all),
+            **{key: json.dumps(getattr(draft, key)) for key in _CAPTAIN_DRAFT_JSON},
+        }
+        assignments = ", ".join(f"{key} = ?" for key in values)
+        await self.conn.execute(
+            f"UPDATE captain_drafts SET {assignments} WHERE id = ?", (*values.values(), draft.id)
+        )
+        await self.conn.commit()

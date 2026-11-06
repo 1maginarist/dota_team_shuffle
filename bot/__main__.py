@@ -18,7 +18,7 @@ from aiogram.types import (
 
 from .config import Config, load_config
 from .db import Database
-from .handlers import mvp, organizer, profile
+from .handlers import captains, mvp, organizer, profile
 from .opendota import OpenDota
 
 log = logging.getLogger("bot")
@@ -43,7 +43,7 @@ class RefreshNameMiddleware(BaseMiddleware):
 def build_dispatcher(db: Database, config: Config, opendota: OpenDota | None = None) -> Dispatcher:
     dp = Dispatcher(db=db, config=config, opendota=opendota or OpenDota(config.opendota_api_key))
     dp.update.outer_middleware(RefreshNameMiddleware())
-    dp.include_routers(profile.router, organizer.router, mvp.router, profile.fallback)
+    dp.include_routers(profile.router, organizer.router, captains.router, mvp.router, profile.fallback)
     return dp
 
 
@@ -56,12 +56,14 @@ async def set_commands(bot: Bot) -> None:
         BotCommand(command="online", description="Я играю — показывать меня"),
         BotCommand(command="offline", description="Я не играю — скрыть меня"),
         BotCommand(command="game", description="Собрать игру (организатор)"),
+        BotCommand(command="draft", description="Immortal Draft: капитаны выбирают игроков"),
         BotCommand(command="players", description="Все игроки"),
         BotCommand(command="mvp", description="MVP вечера: /mvp id1 id2 id3"),
         BotCommand(command="help", description="Как это работает"),
     ]
     group = [
         BotCommand(command="game", description="Собрать игру"),
+        BotCommand(command="draft", description="Immortal Draft: капитаны выбирают игроков"),
         BotCommand(command="players", description="Все игроки"),
         BotCommand(command="online", description="Я играю"),
         BotCommand(command="offline", description="Я не играю"),

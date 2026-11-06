@@ -300,3 +300,37 @@ def balance(
         cost=chosen.cost,
         key=chosen.key,
     )
+
+
+def assign_roles(
+    players: Sequence[Player], weights: Weights | None = None, rng: random.Random | None = None
+) -> tuple[Team, int]:
+    """Расставить позиции внутри уже собранной команды (до 5 человек) по приоритетам ролей.
+
+    Возвращает команду и суммарный штраф за роли.
+    """
+    weights = weights or Weights()
+    rng = rng or random.Random()
+    if not 1 <= len(players) <= TEAM_SIZE:
+        raise ValueError(f"В команде должно быть от 1 до {TEAM_SIZE} игроков")
+    perms = list(itertools.permutations(POSITIONS, len(players)))
+    rng.shuffle(perms)  # случайный выбор среди равноценных раскладок
+    best = min(perms, key=lambda perm: sum(weights.penalty(p, pos) for p, pos in zip(players, perm)))
+    penalty = sum(weights.penalty(p, pos) for p, pos in zip(players, best))
+    by_position = dict(zip(best, players))
+    return Team(slots=tuple(Slot(pos, by_position.get(pos)) for pos in POSITIONS)), penalty
+
+
+def lineup_of(team_a: Sequence[Player], team_b: Sequence[Player], weights: Weights | None = None,
+              rng: random.Random | None = None) -> Lineup:
+    """Lineup из двух готовых составов (например, после драфта капитанов)."""
+    first, pen_a = assign_roles(team_a, weights, rng)
+    second, pen_b = assign_roles(team_b, weights, rng)
+    diff = abs(first.total_mmr - second.total_mmr)
+    return Lineup(
+        teams=(first, second),
+        mmr_diff=diff,
+        role_penalty=pen_a + pen_b,
+        cost=diff + pen_a + pen_b,
+        key=split_key((x.id for x in team_a), (x.id for x in team_b)),
+    )

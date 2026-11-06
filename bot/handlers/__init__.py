@@ -1,3 +1,3 @@
-from . import mvp, organizer, profile
+from . import captains, mvp, organizer, profile
 
-__all__ = ["mvp", "organizer", "profile"]
+__all__ = ["captains", "mvp", "organizer", "profile"]
