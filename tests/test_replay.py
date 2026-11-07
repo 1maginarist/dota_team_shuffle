@@ -44,24 +44,14 @@ def test_positions_are_one_to_five_per_team(match):
         assert sorted(p["position_est"] for p in team) == [1, 2, 3, 4, 5]
 
 
-def test_benchmarks_and_mvp(match):
-    table = {key: [{"percentile": q / 10, "value": q * 100} for q in range(1, 10)]
-             for key in replay.BENCHMARK_FIELDS}
-    replay.apply_benchmarks(match, {p["hero_id"]: table for p in match["players"]})
-    bench = match["players"][0]["benchmarks"]
-    assert 0 <= bench["gold_per_min"]["pct"] <= 1
-    raw_deaths = bench["deaths_per_min"]["raw"]
-    assert bench["deaths_per_min"]["pct"] == pytest.approx(1 - replay.percentile(table["deaths_per_min"], raw_deaths))
+def test_replay_match_scores(match):
     result = compute_mvp([match])
-    assert len(result.ranking) == 10 and not any(g.position_guessed for g in result.matches[0].games)
-
-
-def test_percentile():
-    table = [{"percentile": 0.1, "value": 100}, {"percentile": 0.5, "value": 300}, {"percentile": 0.9, "value": 500}]
-    assert replay.percentile(table, 300) == pytest.approx(0.5)
-    assert replay.percentile(table, 400) == pytest.approx(0.7)
-    assert replay.percentile(table, 9999) == pytest.approx(0.9)
-    assert replay.percentile(table, 50) == pytest.approx(0.05)
+    games = result.matches[0].games
+    assert len(result.ranking) == 10 and not any(g.position_guessed for g in games)
+    # Поля для фэнтези-очков есть в разобранном реплее
+    assert sum(g.fantasy["objectives"] for g in games) > 0
+    assert sum(g.fantasy["runes"] for g in games) > 0
+    assert sum(g.fantasy["first_blood"] for g in games) == 4
 
 
 def test_find_and_decompress(tmp_path):

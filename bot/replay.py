@@ -27,14 +27,7 @@ DEM_MAGIC = b"PBDEMS2"
 REPLAY_SUFFIXES = (".dem", ".dem.bz2", ".dem.zst", ".bz2", ".zst")
 LANE_PHASE = (60, 600)
 # Меняется, когда в разобранных данных появляются новые поля — старый кэш разбираем заново.
-PARSED_FORMAT = 2  # секунды игры, по которым определяем линию
-
-# поле benchmarks OpenDota → как посчитать «сырое» значение
-BENCHMARK_FIELDS = (
-    "gold_per_min", "xp_per_min", "kills_per_min", "deaths_per_min", "assists_per_min",
-    "last_hits_per_min", "hero_damage_per_min", "hero_healing_per_min", "tower_damage",
-)
-
+PARSED_FORMAT = 3  # секунды игры, по которым определяем линию
 
 class ReplayError(Exception):
     pass
@@ -209,7 +202,6 @@ class Aggregator:
                 "stuns": e.get("stuns", 0.0),
                 "teamfight_participation": e.get("teamfight_participation", 0.0),
                 "damage_taken": dict(taken[slot]),
-                "benchmarks": {k: {"raw": v, "pct": None} for k, v in raw.items()},
                 "_lane": self._lane(slot),
             })
         _estimate_positions(players)
@@ -269,34 +261,6 @@ def _estimate_positions(players: list[dict[str, Any]]) -> None:
             p["position_est"] = pos
 
 
-# --- перцентили по героям (OpenDota /benchmarks) ------------------------------------
-
-
-def percentile(table: list[dict[str, float]], value: float) -> float:
-    """Доля игр на этом герое со значением ≤ value (линейная интерполяция по таблице)."""
-    points = sorted((row["value"], row["percentile"]) for row in table)
-    if not points:
-        return 0.5
-    if value <= points[0][0]:
-        return points[0][1] * (value / points[0][0]) if points[0][0] > 0 else points[0][1]
-    for (v1, p1), (v2, p2) in zip(points, points[1:]):
-        if v1 <= value <= v2:
-            return p1 if v2 == v1 else p1 + (p2 - p1) * (value - v1) / (v2 - v1)
-    return points[-1][1]
-
-
-def apply_benchmarks(match: dict[str, Any], tables: dict[int, dict[str, list]]) -> None:
-    """Проставить pct как у OpenDota. Смерти инвертируем: меньше смертей — выше."""
-    for p in match["players"]:
-        table = tables.get(p["hero_id"]) or {}
-        for key, bench in p["benchmarks"].items():
-            rows = table.get(key)
-            if not rows:
-                continue
-            pct = percentile(rows, bench["raw"])
-            bench["pct"] = 1 - pct if key == "deaths_per_min" else pct
-
-
 def events_to_match(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
     aggregator = Aggregator()
     for event in events:
@@ -304,7 +268,7 @@ def events_to_match(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
     return aggregator.result()
 
 
-async def load_local(match_id: int, folder: Path, parser_url: str, opendota) -> dict[str, Any] | None:
+async def load_local(match_id: int, folder: Path, parser_url: str) -> dict[str, Any] | None:
     """Матч из реплея, который лежит в folder. None — реплея нет.
 
     Разобранный результат кэшируется в folder/parsed/<id>.json, повторно не парсим.
@@ -330,11 +294,4 @@ async def load_local(match_id: int, folder: Path, parser_url: str, opendota) -> 
             raise ReplayError(f"В файле {path.name} матч {match['match_id']}, а не {match_id}")
         match["match_id"] = match_id
         cache.write_text(json.dumps(match))
-    tables = {}
-    for hero_id in {p["hero_id"] for p in match["players"]}:
-        try:
-            tables[hero_id] = await opendota.benchmarks(hero_id)
-        except Exception as exc:  # без перцентилей метрики «по герою» просто не учтутся
-            log.warning("Нет перцентилей для героя %s: %s", hero_id, exc)
-    apply_benchmarks(match, tables)
     return match

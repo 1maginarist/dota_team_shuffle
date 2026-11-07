@@ -6,7 +6,7 @@ from statistics import mean
 import pytest
 
 from bot import mvp_texts
-from bot.mvp import SHRINK_GAMES, WIN_BONUS, Z_CLIP, _normal_cdf, compute_mvp, extract_match
+from bot.mvp import FANTASY_ITEMS, SHRINK_GAMES, WIN_BONUS, Z_CLIP, _normal_cdf, compute_mvp, extract_match
 
 FIXTURES = Path(__file__).parent / "fixtures" / "opendota"
 # 9077341933 и 9077497263 — одни и те же 10 игроков, 9077267013 — другие
@@ -26,6 +26,23 @@ def all_games(result):
     return [g for m in result.matches for g in m.games]
 
 
+def test_fantasy_points_follow_valve_table(matches):
+    info = extract_match(matches[0], 1)
+    for g, p in zip(info.games, matches[0]["players"]):
+        assert set(g.fantasy) == set(FANTASY_ITEMS)
+        assert g.fantasy["kills"] == pytest.approx(0.3 * p["kills"])
+        assert g.fantasy["deaths"] == pytest.approx(max(0, 3 - 0.3 * p["deaths"]))
+        assert g.fantasy["wards"] == pytest.approx(0.5 * p["obs_placed"])
+        assert g.fantasy["stacks"] == pytest.approx(0.5 * p["camps_stacked"])
+        assert g.fantasy["stuns"] == pytest.approx(0.05 * p["stuns"], abs=1e-3)
+        assert g.points == pytest.approx(sum(g.fantasy.values()))
+
+
+def test_deaths_never_go_negative():
+    player = {"kills": 0, "deaths": 25}
+    assert FANTASY_ITEMS["deaths"][1](player) == 0
+
+
 def test_every_position_has_same_average(matches):
     result = compute_mvp(matches)
     for pos in range(1, 6):
@@ -34,26 +51,16 @@ def test_every_position_has_same_average(matches):
         assert abs(mean(scores) - 50) < 8, (pos, mean(scores))
 
 
-def test_equal_play_gives_equal_scores_regardless_of_role(matches):
-    """Если внутри каждой позиции все сыграли одинаково, у всех 50 — и у керри, и у пятёрки."""
-    match = matches[0]
-    for p in match["players"]:
-        for bench in p["benchmarks"].values():
-            bench["pct"] = 0.5
-        for key in ("obs_placed", "sen_placed", "observer_kills", "sentry_kills", "camps_stacked", "stuns"):
-            p[key] = 3
-        p["teamfight_participation"] = 0.5
-        p["damage_taken"] = {"npc_dota_hero_axe": 1000}
-    result = compute_mvp([match])
-    for g in all_games(result):
-        assert g.base_score == pytest.approx(50)
-        assert g.score == pytest.approx(50 * (WIN_BONUS if g.won else 1))
+def test_more_points_within_position_means_higher_score(matches):
+    result = compute_mvp(matches)
+    for pos in range(1, 6):
+        group = sorted((g for g in all_games(result) if g.position == pos), key=lambda g: g.points)
+        assert [g.base_score for g in group] == sorted(g.base_score for g in group)
 
 
 def test_players_are_merged_across_matches(matches):
     result = compute_mvp(matches)
-    games_count = sorted(len(t.games) for t in result.ranking)
-    assert games_count == [1] * 10 + [2] * 10
+    assert sorted(len(t.games) for t in result.ranking) == [1] * 10 + [2] * 10
     assert result.anonymous_count == 0
 
 
@@ -70,8 +77,7 @@ def test_win_bonus_and_final_formula(matches):
 
 def test_one_lucky_game_never_beats_three_strong_ones():
     best_possible = 100 * _normal_cdf(Z_CLIP) * WIN_BONUS
-    # Средний балл лобби по построению ≈ 50 × (1 + бонус победы у половины) ≈ 52.5,
-    # на реальных матчах выходит 52–54.
+    # Средний балл лобби по построению ≈ 52.5, на реальных матчах 52–54.
     for lobby_mean in (50, 52.5, 54):
         one = (best_possible + SHRINK_GAMES * lobby_mean) / (1 + SHRINK_GAMES)
         three = (3 * 85 + SHRINK_GAMES * lobby_mean) / (3 + SHRINK_GAMES)
@@ -86,24 +92,15 @@ def test_positions_from_opendota(matches):
     assert not any(g.position_guessed for g in info.games)
 
 
-def test_healing_counts_only_for_healers(matches):
-    info = extract_match(matches[0], 1)
-    for g, p in zip(info.games, matches[0]["players"]):
-        heals = p["benchmarks"]["hero_healing_per_min"]["raw"] >= 10
-        assert ("heal" in g.metrics) == heals
-
-
 def test_unparsed_match_still_works(matches):
     raw = copy.deepcopy(matches[2])
     raw["version"] = None
     for p in raw["players"]:
-        for key in ("position_est", "obs_placed", "sen_placed", "observer_kills", "sentry_kills",
-                    "camps_stacked", "stuns", "teamfight_participation", "damage_taken"):
+        for key in ("position_est", "obs_placed", "camps_stacked", "stuns", "teamfight_participation"):
             p[key] = None
-    result = compute_mvp([raw])
-    games = all_games(result)
+    games = all_games(compute_mvp([raw]))
     assert all(g.position_guessed for g in games)
-    assert all("vision" not in g.metrics for g in games)
+    assert all(g.fantasy["wards"] == 0 for g in games)
     for radiant in (True, False):
         team = [g for g, p in zip(games, raw["players"]) if p["isRadiant"] == radiant]
         assert sorted(g.position for g in team) == [1, 2, 3, 4, 5]
@@ -130,28 +127,9 @@ def test_texts_render(matches):
     result = compute_mvp(matches)
     heroes = {g.hero_id: f"Hero{g.hero_id}" for g in all_games(result)}
     summary = mvp_texts.summary(result, heroes, ["тестовое предупреждение"])
-    assert "MVP вечера" in summary and "Рейтинг" in summary and "тестовое предупреждение" in summary
+    assert "MVP вечера" in summary and "очк." in summary and "тестовое предупреждение" in summary
     assert mvp_texts.player_name(result.mvp, heroes) in summary
     assert len(summary) <= 4096
     details = mvp_texts.breakdown(result, heroes)
-    assert "Разбор лидеров" in details and len(details) <= 4096
-
-
-def test_fantasy_formula(matches):
-    from bot.mvp import FANTASY_ITEMS
-
-    result = compute_mvp(matches, formula="fantasy")
-    games = all_games(result)
-    # Очки считаются по классической таблице Valve
-    p = matches[0]["players"][0]
-    g = next(x for x in games if x.match_id == matches[0]["match_id"] and x.key == str(p["account_id"]))
-    assert g.fantasy["kills"] == pytest.approx(0.3 * p["kills"])
-    assert g.fantasy["deaths"] == pytest.approx(max(0, 3 - 0.3 * p["deaths"]))
-    assert set(g.fantasy) == set(FANTASY_ITEMS)
-    # Та же поправка на позицию: средний балл позиции около 50
-    for pos in range(1, 6):
-        assert abs(mean(x.base_score for x in games if x.position == pos) - 50) < 8
-    text = mvp_texts.fantasy(result, {}, compute_mvp(matches).mvp.key)
-    assert "фэнтези-очки Valve" in text and "Откуда очки" in text and len(text) <= 4096
-    with pytest.raises(ValueError):
-        compute_mvp(matches, formula="nope")
+    assert "Откуда очки" in details and "Убийства" in details and len(details) <= 4096
+    assert "0.3 за убийство" in mvp_texts.HELP

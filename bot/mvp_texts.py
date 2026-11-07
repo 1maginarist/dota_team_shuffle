@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape as _escape
 
 from .balancer import POSITION_NAMES
-from .mvp import COMPONENT_NAMES, FANTASY_ITEMS, POSITION_WEIGHTS, WIN_BONUS, MvpResult, PlayerGame, PlayerTotal
+from .mvp import FANTASY_ITEMS, WIN_BONUS, MvpResult, PlayerGame, PlayerTotal
 from .opendota import MatchLoad
 
 STEAM64_BASE = 76561197960265728
@@ -23,33 +23,21 @@ USAGE = (
 
 HELP = (
     "🏆 <b>Как считается MVP</b>\n\n"
-    "Статистику берём из OpenDota (у Dotabuff нет открытого API, данные те же). "
-    "Если реплей ещё не разобран, бот сам отправляет его на разбор и ждёт.\n\n"
-    "<b>1. Сравниваем с игроками своей позиции.</b> Пятёрку — с пятёрками, керри — с керри. "
-    "Поэтому керри не становится MVP просто потому, что у него больше фарма.\n\n"
-    "<b>2. Метрики.</b> Фарм, опыт, добивания, убийства, помощь, урон, смерти, урон по строениям, "
-    "лечение — в перцентилях OpenDota относительно всех игр на этом же герое (средняя игра на "
-    "Пудже = средняя игра на Антимаге). Плюс варды, девард, стаки, оглушения, урон, принятый от героев, "
-    "и участие в драках.\n\n"
-    "<b>3. Веса зависят от позиции:</b>\n"
-    "• Керри: фарм 35%, драки 30%, объекты 20%, выживание 15%\n"
-    "• Мид: драки 40%, фарм 25%, объекты 15%, выживание 15%, контроль 5%\n"
-    "• Оффлейн: драки 30%, контроль 25% (оглушения + танкование), фарм 15%, объекты 15%, "
-    "выживание 10%, саппорт 5%\n"
-    "• Семи-сап: драки 35%, саппорт 25%, контроль 15%, выживание 15%, фарм 5%, объекты 5%\n"
-    "• Фулл-сап: саппорт 40% (варды, девард, стаки, лечение), драки 25%, выживание 15%, "
-    "контроль 10%, фарм 5%, объекты 5%\n\n"
-    "<b>4. Балл матча</b> — насколько ты лучше остальных на своей позиции. 50 — средний уровень, "
-    "у каждой позиции одинаковые шансы. "
+    "Статистика — из OpenDota или из реплея, который лежит на сервере (для приватных лобби).\n\n"
+    "<b>1. Фэнтези-очки Valve</b> — классическая система The International:\n"
+    "• 0.3 за убийство\n"
+    "• 3 − 0.3 за каждую смерть (не меньше 0)\n"
+    "• 0.003 за добивание и денай, 0.002 за единицу GPM\n"
+    "• 1 за башню или Рошана\n"
+    "• 3 × участие в драках\n"
+    "• 0.5 за обсервер, 0.5 за стак, 0.25 за руну\n"
+    "• 4 за первую кровь, 0.05 за секунду оглушения\n\n"
+    "<b>2. Сравнение внутри позиции.</b> Очки пятёрки сравниваются с пятёрками, керри — с керри. "
+    "Без этого почти всегда выигрывал бы мидер. Балл матча 0–100: 50 — средний уровень позиции. "
     f"Победа ×{WIN_BONUS:.1f}.\n\n"
-    "<b>5. Итог вечера</b> — средний балл с поправкой: к играм каждого добавляются две «средние игры лобби». "
+    "<b>3. Итог вечера</b> — средний балл с поправкой: к играм каждого добавляются две «средние игры лобби». "
     "Одна случайная удачная игра не перевешивает три стабильно сильные, а пропуск матча из-за скамейки "
     "стоит всего несколько баллов.\n\n"
-    "<b>Вторая версия</b> — классические фэнтези-очки Valve с The International: 0.3 за убийство, "
-    "3 − 0.3 за каждую смерть, 0.003 за добивание и денай, 0.002 за единицу GPM, 1 за башню или Рошана, "
-    "3 × участие в драках, 0.5 за обсервер, 0.5 за стак, 0.25 за руну, 4 за первую кровь, "
-    "0.05 за секунду оглушения. Очки тоже сравниваются внутри позиции (иначе почти всегда "
-    "выигрывает мидер), победа ×1.1, итог вечера считается так же.\n\n"
     "⚠️ Чтобы игрока можно было узнать по матчам, у всех в Dota должна быть включена "
     "«Общедоступная история матчей» (Expose Public Match Data). Иначе он будет анонимом."
 )
@@ -107,7 +95,8 @@ def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> s
 
     lines += ["", "📊 <b>Рейтинг вечера</b>"]
     for place, total in enumerate(result.ranking, start=1):
-        games = " · ".join(f"#{g.match_index} {g.score:.0f}" for g in sorted(total.games, key=lambda g: g.match_index))
+        games = " · ".join(f"#{g.match_index} {g.score:.0f} ({g.points:.1f} очк.)"
+                           for g in sorted(total.games, key=lambda g: g.match_index))
         medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(place, f"{place}.")
         lines.append(f"{medal} {player_name(total, heroes)} — <b>{total.adjusted:.1f}</b> <i>({games})</i>")
 
@@ -131,55 +120,25 @@ def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> s
         lines += [""] + [f"⚠️ {escape(n)}" for n in notes]
     lines += [
         "",
-        f"<i>Балл матча: 50 — средний уровень своей позиции, победа ×{WIN_BONUS:.1f}. "
+        f"<i>Фэнтези-очки Valve, сравнение внутри позиции: 50 — средний уровень позиции, победа ×{WIN_BONUS:.1f}. "
         "Итог — среднее за матчи с поправкой на число игр. Как считается: /mvphelp</i>",
     ]
     return _fit("\n".join(lines))
 
 
 def breakdown(result: MvpResult, heroes: dict[int, str], top: int = 3) -> str:
-    lines = ["🔎 <b>Разбор лидеров</b> (составляющие 0–100, в скобках — вес для позиции)"]
+    lines = ["🔎 <b>Откуда очки у лидеров</b> (фэнтези-очки Valve за матч)"]
     for total in result.ranking[:top]:
         lines += ["", f"<b>{player_name(total, heroes)}</b> — {total.adjusted:.1f}"]
         for g in sorted(total.games, key=lambda g: g.match_index):
             outcome = f"победа ×{WIN_BONUS:.1f}" if g.won else "поражение"
             lines.append(
                 f"#{g.match_index} {_hero(heroes, g.hero_id)} · {_position(g)} {POSITION_NAMES[g.position]} · "
-                f"{outcome} → <b>{g.score:.1f}</b>"
+                f"{g.points:.1f} очк. · {outcome} → <b>{g.score:.1f}</b>"
             )
-            weights = POSITION_WEIGHTS[g.position]
-            parts = [
-                f"{COMPONENT_NAMES[c]} {g.components[c]:.0f} ({weights[c]}%)"
-                for c in sorted(weights, key=lambda c: -weights[c])
-                if weights[c] > 0 and c in g.components
-            ]
+            parts = [f"{FANTASY_ITEMS[k][0]} {v:.1f}"
+                     for k, v in sorted(g.fantasy.items(), key=lambda kv: -kv[1]) if v > 0]
             lines.append("   " + " · ".join(parts))
-    return _fit("\n".join(lines))
-
-
-def fantasy(result: MvpResult, heroes: dict[int, str], main_mvp_key: str | None = None) -> str:
-    """Вторая версия: фэнтези-очки Valve, сравнение внутри позиции."""
-    mvp = result.mvp
-    lines = [
-        "🎯 <b>Вторая версия — фэнтези-очки Valve</b>",
-        "<i>Классическая система The International: убийства, смерти, фарм, драки, варды, стаки, "
-        "оглушения и т.д. Очки сравниваются внутри позиции, победа ×1.1.</i>",
-        "",
-        f"🏆 MVP по этой версии — <b>{player_name(mvp, heroes)}</b> · {mvp.adjusted:.1f}"
-        + (" (совпадает с основной)" if main_mvp_key == mvp.key else ""),
-        "",
-    ]
-    for place, total in enumerate(result.ranking, start=1):
-        games = " · ".join(
-            f"#{g.match_index} {sum(g.fantasy.values()):.1f} очк." for g in sorted(total.games, key=lambda g: g.match_index)
-        )
-        medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(place, f"{place}.")
-        lines.append(f"{medal} {player_name(total, heroes)} — <b>{total.adjusted:.1f}</b> <i>({games})</i>")
-    lines += ["", f"🔎 <b>Откуда очки у {player_name(mvp, heroes)}</b>"]
-    for g in sorted(mvp.games, key=lambda g: g.match_index):
-        parts = [f"{FANTASY_ITEMS[k][0]} {v:.1f}" for k, v in sorted(g.fantasy.items(), key=lambda kv: -kv[1]) if v > 0]
-        lines.append(f"#{g.match_index} {_hero(heroes, g.hero_id)} · {_position(g)} → {sum(g.fantasy.values()):.1f} очк.: "
-                     + ", ".join(parts))
     return _fit("\n".join(lines))
 
 
