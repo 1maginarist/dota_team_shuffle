@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape as _escape
 
 from .balancer import POSITION_NAMES
-from .mvp import FANTASY_ITEMS, WIN_BONUS, MvpResult, PlayerGame, PlayerTotal
+from .mvp import FANTASY_ITEMS, POSITION_FACTORS, MvpResult, PlayerGame, PlayerTotal
 from .opendota import MatchLoad
 
 STEAM64_BASE = 76561197960265728
@@ -32,12 +32,12 @@ HELP = (
     "• 3 × участие в драках\n"
     "• 0.5 за обсервер, 0.5 за стак, 0.25 за руну\n"
     "• 4 за первую кровь, 0.05 за секунду оглушения\n\n"
-    "<b>2. Сравнение внутри позиции.</b> Очки пятёрки сравниваются с пятёрками, керри — с керри. "
-    "Без этого почти всегда выигрывал бы мидер. Балл матча 0–100: 50 — средний уровень позиции. "
-    f"Победа ×{WIN_BONUS:.1f}.\n\n"
-    "<b>3. Итог вечера</b> — средний балл с поправкой: к играм каждого добавляются две «средние игры лобби». "
-    "Одна случайная удачная игра не перевешивает три стабильно сильные, а пропуск матча из-за скамейки "
-    "стоит всего несколько баллов.\n\n"
+    "<b>2. Поправка на позицию.</b> Очки умножаются на коэффициент, чтобы у всех позиций было "
+    "одинаковое среднее: "
+    + ", ".join(f"{POSITION_NAMES[p].lower()} ×{f:.2f}" for p, f in POSITION_FACTORS.items())
+    + ". Без неё таблица Valve почти всегда выбирает мидера.\n\n"
+    "<b>3. Итог вечера</b> — среднее число очков за сыгранный матч. Кто сидел на скамейке, "
+    "не теряет очки за пропуск. При равенстве выше тот, у кого больше очков в сумме.\n\n"
     "⚠️ Чтобы игрока можно было узнать по матчам, у всех в Dota должна быть включена "
     "«Общедоступная история матчей» (Expose Public Match Data). Иначе он будет анонимом."
 )
@@ -80,11 +80,11 @@ def progress(loads: list[MatchLoad], elapsed: int) -> str:
 
 def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> str:
     mvp = result.mvp
-    best = max(mvp.games, key=lambda g: g.score)
+    best = max(mvp.games, key=lambda g: g.points)
     lines = [
         f"🏆 <b>MVP вечера — {player_name(mvp, heroes)}</b>",
-        f"Итоговый балл <b>{mvp.adjusted:.1f}</b> · матчей: {len(mvp.games)} · средний {mvp.average:.1f}",
-        f"Лучшая игра: {_hero(heroes, best.hero_id)}, {_position(best)} — {best.score:.1f} "
+        f"<b>{mvp.average:.1f}</b> очк. за матч · матчей: {len(mvp.games)} · всего {mvp.total:.1f}",
+        f"Лучшая игра: {_hero(heroes, best.hero_id)}, {_position(best)} — {best.points:.1f} очк. "
         f"(матч #{best.match_index}{', победа' if best.won else ''})",
     ]
     if mvp.account_id is not None:
@@ -95,10 +95,9 @@ def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> s
 
     lines += ["", "📊 <b>Рейтинг вечера</b>"]
     for place, total in enumerate(result.ranking, start=1):
-        games = " · ".join(f"#{g.match_index} {g.score:.0f} ({g.points:.1f} очк.)"
-                           for g in sorted(total.games, key=lambda g: g.match_index))
+        games = " · ".join(f"#{g.match_index} {g.points:.1f}" for g in sorted(total.games, key=lambda g: g.match_index))
         medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(place, f"{place}.")
-        lines.append(f"{medal} {player_name(total, heroes)} — <b>{total.adjusted:.1f}</b> <i>({games})</i>")
+        lines.append(f"{medal} {player_name(total, heroes)} — <b>{total.average:.1f}</b> <i>({games})</i>")
 
     lines += ["", "🎮 <b>Матчи</b>"]
     for match in result.matches:
@@ -107,7 +106,7 @@ def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> s
         lines.append(
             f'#{match.index} <a href="https://www.dotabuff.com/matches/{match.match_id}">{match.match_id}</a> · '
             f"{match.duration_min:.0f} мин · победа: {winner} — лучший: "
-            f"{_name(top.name, top.account_id, top, heroes)} ({_hero(heroes, top.hero_id)}) {top.score:.1f}"
+            f"{_name(top.name, top.account_id, top, heroes)} ({_hero(heroes, top.hero_id)}) {top.points:.1f} очк."
         )
 
     notes = list(warnings)
@@ -120,8 +119,9 @@ def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> s
         lines += [""] + [f"⚠️ {escape(n)}" for n in notes]
     lines += [
         "",
-        f"<i>Фэнтези-очки Valve, сравнение внутри позиции: 50 — средний уровень позиции, победа ×{WIN_BONUS:.1f}. "
-        "Итог — среднее за матчи с поправкой на число игр. Как считается: /mvphelp</i>",
+        "<i>Фэнтези-очки Valve с поправкой на позицию: в рейтинге — среднее за сыгранный матч, "
+        "в скобках — очки по матчам. "
+        "Как считается: /mvphelp</i>",
     ]
     return _fit("\n".join(lines))
 
@@ -129,12 +129,12 @@ def summary(result: MvpResult, heroes: dict[int, str], warnings: list[str]) -> s
 def breakdown(result: MvpResult, heroes: dict[int, str], top: int = 3) -> str:
     lines = ["🔎 <b>Откуда очки у лидеров</b> (фэнтези-очки Valve за матч)"]
     for total in result.ranking[:top]:
-        lines += ["", f"<b>{player_name(total, heroes)}</b> — {total.adjusted:.1f}"]
+        lines += ["", f"<b>{player_name(total, heroes)}</b> — {total.average:.1f} очк. за матч"]
         for g in sorted(total.games, key=lambda g: g.match_index):
-            outcome = f"победа ×{WIN_BONUS:.1f}" if g.won else "поражение"
+            outcome = "победа" if g.won else "поражение"
             lines.append(
                 f"#{g.match_index} {_hero(heroes, g.hero_id)} · {_position(g)} {POSITION_NAMES[g.position]} · "
-                f"{g.points:.1f} очк. · {outcome} → <b>{g.score:.1f}</b>"
+                f"{outcome} → {g.raw_points:.1f} × {g.factor:.2f} = <b>{g.points:.1f} очк.</b>"
             )
             parts = [f"{FANTASY_ITEMS[k][0]} {v:.1f}"
                      for k, v in sorted(g.fantasy.items(), key=lambda kv: -kv[1]) if v > 0]

@@ -1,36 +1,26 @@
-"""Выбор MVP по нескольким матчам Dota 2 — по фэнтези-очкам Valve.
+"""Выбор MVP по нескольким матчам Dota 2 — только фэнтези-очки Valve.
 
-Как считается балл игрока за матч
----------------------------------
-1. Фэнтези-очки по классической таблице Valve с The International
-   (FANTASY_ITEMS): убийства, смерти, фарм, башни и Рошан, участие в драках,
-   варды, стаки, руны, первая кровь, оглушения.
-2. Очки сравниваются только с игроками ТОЙ ЖЕ ПОЗИЦИИ за вечер — и по
-   среднему, и по разбросу. Без этого MVP почти всегда доставался бы мидеру
-   (на 34 реальных матчах — 16 раз из 34). Балл 0–100, 50 — средний игрок
-   позиции.
-3. Победа умножает балл матча на WIN_BONUS.
-
-Итог вечера — средний балл с поправкой на число игр: к играм каждого
-добавляется SHRINK_GAMES «виртуальной средней игры». Одна случайная
-удачная игра не перевешивает три стабильно сильные.
+За каждый матч игрок получает фэнтези-очки по классической таблице Valve
+с The International (FANTASY_ITEMS), умноженные на коэффициент позиции
+(POSITION_FACTORS). Без коэффициентов таблица Valve перекошена: мидер на
+34 реальных матчах набирал в среднем 16.2 очка, а оффлейнер 12.1, и лучшим
+в матче мидер оказывался 16 раз из 34. Коэффициент = среднее очков всех
+игроков / среднее очков позиции, так что у всех позиций одинаковое среднее.
+Итог вечера — среднее число очков за
+сыгранный матч (так тот, кто сидел на скамейке, не теряет очки за пропуск);
+при равенстве выше тот, у кого больше очков в сумме.
 """
 
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from statistics import mean
-from typing import Any, Iterable
+from typing import Any
 
-WIN_BONUS = 1.10
-SHRINK_GAMES = 2.0
-Z_CLIP = 2.5
-# При нормировке разброса внутри позиции подмешиваем общий разброс как
-# столько «виртуальных игр» — чтобы при 1 матче (2 игрока на позицию)
-# не терялась информация о том, насколько один лучше другого.
-SPREAD_PRIOR_GAMES = 1.0
+# Коэффициенты позиций: выравнивают среднее число фэнтези-очков у позиций
+# (посчитаны на 34 разобранных матчах: средние 13.4 / 16.2 / 12.1 / 13.6 / 13.1).
+POSITION_FACTORS: dict[int, float] = {1: 1.02, 2: 0.84, 3: 1.13, 4: 1.01, 5: 1.04}
 
 # Классические фэнтези-очки Valve (The International).
 # Ключ → (подпись, функция от статистики игрока в формате OpenDota)
@@ -61,16 +51,24 @@ class PlayerGame:
     position_guessed: bool  # позиция определена грубо (матч без разбора реплея)
     won: bool
     fantasy: dict[str, float] = field(default_factory=dict)  # фэнтези-очки по статьям
-    base_score: float = 50.0
-    score: float = 50.0
 
     @property
     def anonymous(self) -> bool:
         return self.account_id is None
 
     @property
-    def points(self) -> float:
+    def raw_points(self) -> float:
+        """Фэнтези-очки по таблице Valve, без поправки на позицию."""
         return sum(self.fantasy.values())
+
+    @property
+    def factor(self) -> float:
+        return POSITION_FACTORS[self.position]
+
+    @property
+    def points(self) -> float:
+        """Очки с поправкой на позицию — по ним рейтинг."""
+        return self.raw_points * self.factor
 
 
 @dataclass
@@ -84,7 +82,7 @@ class MatchInfo:
 
     @property
     def mvp(self) -> PlayerGame:
-        return max(self.games, key=lambda g: g.score)
+        return max(self.games, key=lambda g: g.points)
 
 
 @dataclass
@@ -93,15 +91,14 @@ class PlayerTotal:
     account_id: int | None
     name: str | None
     games: list[PlayerGame]
-    average: float
-    adjusted: float
+    average: float  # среднее очков за сыгранный матч — по нему рейтинг
+    total: float  # сумма очков за вечер
 
 
 @dataclass
 class MvpResult:
     matches: list[MatchInfo]
     ranking: list[PlayerTotal]
-    lobby_mean: float
 
     @property
     def mvp(self) -> PlayerTotal:
@@ -183,41 +180,11 @@ def extract_match(match: dict[str, Any], index: int) -> MatchInfo:
 # --- подсчёт ------------------------------------------------------------------
 
 
-def _normal_cdf(z: float) -> float:
-    return 0.5 * (1 + math.erf(z / math.sqrt(2)))
-
-
-def _clip(z: float) -> float:
-    return max(-Z_CLIP, min(Z_CLIP, z))
-
-
-def score_games(games: Iterable[PlayerGame]) -> None:
-    """Проставить баллы 0–100: фэнтези-очки, нормированные внутри позиции."""
-    games = list(games)
-
-    # Нормировка внутри позиции: одинаковые среднее и разброс у каждой позиции
-    by_position: dict[int, list[PlayerGame]] = defaultdict(list)
-    for g in games:
-        by_position[g.position].append(g)
-    centers = {pos: mean(x.points for x in group) for pos, group in by_position.items()}
-    pooled_var = mean((g.points - centers[g.position]) ** 2 for g in games)
-    for pos, group in by_position.items():
-        n = len(group)
-        own_var = mean((x.points - centers[pos]) ** 2 for x in group)
-        spread = math.sqrt((n * own_var + SPREAD_PRIOR_GAMES * pooled_var) / (n + SPREAD_PRIOR_GAMES))
-        for g in group:
-            z = 0.0 if spread < 1e-9 else _clip((g.points - centers[pos]) / spread)
-            g.base_score = 100 * _normal_cdf(z)
-            g.score = g.base_score * (WIN_BONUS if g.won else 1.0)
-
-
 def compute_mvp(raw_matches: list[dict[str, Any]]) -> MvpResult:
     if not raw_matches:
         raise ValueError("Нет матчей для подсчёта")
     matches = [extract_match(m, i) for i, m in enumerate(raw_matches, start=1)]
     all_games = [g for m in matches for g in m.games]
-    score_games(all_games)
-    lobby_mean = mean(g.score for g in all_games)
 
     by_player: dict[str, list[PlayerGame]] = defaultdict(list)
     for g in all_games:
@@ -225,7 +192,7 @@ def compute_mvp(raw_matches: list[dict[str, Any]]) -> MvpResult:
 
     ranking = []
     for key, games in by_player.items():
-        scores = [g.score for g in games]
+        points = [g.points for g in games]
         named = next((g.name for g in games if g.name), None)
         ranking.append(
             PlayerTotal(
@@ -233,9 +200,9 @@ def compute_mvp(raw_matches: list[dict[str, Any]]) -> MvpResult:
                 account_id=games[0].account_id,
                 name=named,
                 games=games,
-                average=mean(scores),
-                adjusted=(sum(scores) + SHRINK_GAMES * lobby_mean) / (len(scores) + SHRINK_GAMES),
+                average=mean(points),
+                total=sum(points),
             )
         )
-    ranking.sort(key=lambda t: (-t.adjusted, -t.average, -len(t.games)))
-    return MvpResult(matches=matches, ranking=ranking, lobby_mean=lobby_mean)
+    ranking.sort(key=lambda t: (-t.average, -t.total))
+    return MvpResult(matches=matches, ranking=ranking)
