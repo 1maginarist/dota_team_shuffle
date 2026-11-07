@@ -84,6 +84,24 @@ POSITION_WEIGHTS: dict[int, dict[str, int]] = {
 }
 
 
+# Вторая версия формулы — классические фэнтези-очки Valve (The International).
+# Ключ → (подпись, функция от статистики игрока в формате OpenDota)
+FANTASY_ITEMS: dict[str, tuple[str, Any]] = {
+    "kills": ("Убийства", lambda p: 0.3 * _num(p.get("kills"))),
+    "deaths": ("Смерти", lambda p: max(0.0, 3 - 0.3 * _num(p.get("deaths")))),
+    "farm": ("Фарм", lambda p: 0.003 * (_num(p.get("last_hits")) + _num(p.get("denies")))
+             + 0.002 * _num(p.get("gold_per_min"))),
+    "objectives": ("Башни/Рошан", lambda p: _num(p.get("towers_killed")) + _num(p.get("roshans_killed"))),
+    "teamfight": ("Драки", lambda p: 3 * _num(p.get("teamfight_participation"))),
+    "wards": ("Варды", lambda p: 0.5 * _num(p.get("obs_placed"))),
+    "stacks": ("Стаки", lambda p: 0.5 * _num(p.get("camps_stacked"))),
+    "runes": ("Руны", lambda p: 0.25 * _num(p.get("rune_pickups"))),
+    "first_blood": ("Первая кровь", lambda p: 4 * _num(p.get("firstblood_claimed"))),
+    "stuns": ("Оглушения", lambda p: 0.05 * _num(p.get("stuns"))),
+}
+FORMULAS = ("role", "fantasy")
+
+
 @dataclass
 class PlayerGame:
     match_id: int
@@ -96,6 +114,7 @@ class PlayerGame:
     position_guessed: bool  # позиция определена грубо (матч без разбора реплея)
     won: bool
     metrics: dict[str, float]
+    fantasy: dict[str, float] = field(default_factory=dict)  # фэнтези-очки по статьям
     metric_z: dict[str, float] = field(default_factory=dict)
     components: dict[str, float] = field(default_factory=dict)  # 0–100 для показа
     composite: float = 0.0  # взвешенная сумма z до нормировки по позиции
@@ -227,6 +246,7 @@ def extract_match(match: dict[str, Any], index: int) -> MatchInfo:
                 position_guessed=guessed,
                 won=is_radiant == radiant_win,
                 metrics=metrics,
+                fantasy={key: round(fn(p), 3) for key, (_, fn) in FANTASY_ITEMS.items()},
             )
         )
     return MatchInfo(
@@ -250,8 +270,14 @@ def _clip(z: float) -> float:
     return max(-Z_CLIP, min(Z_CLIP, z))
 
 
-def score_games(games: Iterable[PlayerGame]) -> None:
-    """Проставить баллы 0–100 метрикам, составляющим и матчам (на месте)."""
+def score_games(games: Iterable[PlayerGame], formula: str = "role") -> None:
+    """Проставить баллы 0–100 метрикам, составляющим и матчам (на месте).
+
+    formula="role" — наша формула с весами по позиции,
+    formula="fantasy" — фэнтези-очки Valve; дальше та же нормировка по позиции.
+    """
+    if formula not in FORMULAS:
+        raise ValueError(f"Неизвестная формула: {formula}")
     games = list(games)
 
     # 1–2. z-оценка каждой метрики внутри позиции
@@ -277,6 +303,8 @@ def score_games(games: Iterable[PlayerGame]) -> None:
         used = {c: w for c, w in POSITION_WEIGHTS[g.position].items() if w > 0 and c in component_z}
         total = sum(used.values())
         g.composite = sum(component_z[c] * w for c, w in used.items()) / total if total else 0.0
+        if formula == "fantasy":
+            g.composite = sum(g.fantasy.values())
 
     # 4. нормировка итога внутри позиции: одинаковые среднее и разброс
     by_position: dict[int, list[PlayerGame]] = defaultdict(list)
@@ -294,12 +322,12 @@ def score_games(games: Iterable[PlayerGame]) -> None:
             g.score = g.base_score * (WIN_BONUS if g.won else 1.0)
 
 
-def compute_mvp(raw_matches: list[dict[str, Any]]) -> MvpResult:
+def compute_mvp(raw_matches: list[dict[str, Any]], formula: str = "role") -> MvpResult:
     if not raw_matches:
         raise ValueError("Нет матчей для подсчёта")
     matches = [extract_match(m, i) for i, m in enumerate(raw_matches, start=1)]
     all_games = [g for m in matches for g in m.games]
-    score_games(all_games)
+    score_games(all_games, formula)
     lobby_mean = mean(g.score for g in all_games)
 
     by_player: dict[str, list[PlayerGame]] = defaultdict(list)

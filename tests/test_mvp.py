@@ -135,3 +135,23 @@ def test_texts_render(matches):
     assert len(summary) <= 4096
     details = mvp_texts.breakdown(result, heroes)
     assert "Разбор лидеров" in details and len(details) <= 4096
+
+
+def test_fantasy_formula(matches):
+    from bot.mvp import FANTASY_ITEMS
+
+    result = compute_mvp(matches, formula="fantasy")
+    games = all_games(result)
+    # Очки считаются по классической таблице Valve
+    p = matches[0]["players"][0]
+    g = next(x for x in games if x.match_id == matches[0]["match_id"] and x.key == str(p["account_id"]))
+    assert g.fantasy["kills"] == pytest.approx(0.3 * p["kills"])
+    assert g.fantasy["deaths"] == pytest.approx(max(0, 3 - 0.3 * p["deaths"]))
+    assert set(g.fantasy) == set(FANTASY_ITEMS)
+    # Та же поправка на позицию: средний балл позиции около 50
+    for pos in range(1, 6):
+        assert abs(mean(x.base_score for x in games if x.position == pos) - 50) < 8
+    text = mvp_texts.fantasy(result, {}, compute_mvp(matches).mvp.key)
+    assert "фэнтези-очки Valve" in text and "Откуда очки" in text and len(text) <= 4096
+    with pytest.raises(ValueError):
+        compute_mvp(matches, formula="nope")

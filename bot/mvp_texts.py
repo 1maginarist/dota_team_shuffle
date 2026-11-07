@@ -3,7 +3,7 @@ from __future__ import annotations
 from html import escape as _escape
 
 from .balancer import POSITION_NAMES
-from .mvp import COMPONENT_NAMES, POSITION_WEIGHTS, WIN_BONUS, MvpResult, PlayerGame, PlayerTotal
+from .mvp import COMPONENT_NAMES, FANTASY_ITEMS, POSITION_WEIGHTS, WIN_BONUS, MvpResult, PlayerGame, PlayerTotal
 from .opendota import MatchLoad
 
 STEAM64_BASE = 76561197960265728
@@ -45,6 +45,11 @@ HELP = (
     "<b>5. Итог вечера</b> — средний балл с поправкой: к играм каждого добавляются две «средние игры лобби». "
     "Одна случайная удачная игра не перевешивает три стабильно сильные, а пропуск матча из-за скамейки "
     "стоит всего несколько баллов.\n\n"
+    "<b>Вторая версия</b> — классические фэнтези-очки Valve с The International: 0.3 за убийство, "
+    "3 − 0.3 за каждую смерть, 0.003 за добивание и денай, 0.002 за единицу GPM, 1 за башню или Рошана, "
+    "3 × участие в драках, 0.5 за обсервер, 0.5 за стак, 0.25 за руну, 4 за первую кровь, "
+    "0.05 за секунду оглушения. Очки тоже сравниваются внутри позиции (иначе почти всегда "
+    "выигрывает мидер), победа ×1.1, итог вечера считается так же.\n\n"
     "⚠️ Чтобы игрока можно было узнать по матчам, у всех в Dota должна быть включена "
     "«Общедоступная история матчей» (Expose Public Match Data). Иначе он будет анонимом."
 )
@@ -149,6 +154,32 @@ def breakdown(result: MvpResult, heroes: dict[int, str], top: int = 3) -> str:
                 if weights[c] > 0 and c in g.components
             ]
             lines.append("   " + " · ".join(parts))
+    return _fit("\n".join(lines))
+
+
+def fantasy(result: MvpResult, heroes: dict[int, str], main_mvp_key: str | None = None) -> str:
+    """Вторая версия: фэнтези-очки Valve, сравнение внутри позиции."""
+    mvp = result.mvp
+    lines = [
+        "🎯 <b>Вторая версия — фэнтези-очки Valve</b>",
+        "<i>Классическая система The International: убийства, смерти, фарм, драки, варды, стаки, "
+        "оглушения и т.д. Очки сравниваются внутри позиции, победа ×1.1.</i>",
+        "",
+        f"🏆 MVP по этой версии — <b>{player_name(mvp, heroes)}</b> · {mvp.adjusted:.1f}"
+        + (" (совпадает с основной)" if main_mvp_key == mvp.key else ""),
+        "",
+    ]
+    for place, total in enumerate(result.ranking, start=1):
+        games = " · ".join(
+            f"#{g.match_index} {sum(g.fantasy.values()):.1f} очк." for g in sorted(total.games, key=lambda g: g.match_index)
+        )
+        medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(place, f"{place}.")
+        lines.append(f"{medal} {player_name(total, heroes)} — <b>{total.adjusted:.1f}</b> <i>({games})</i>")
+    lines += ["", f"🔎 <b>Откуда очки у {player_name(mvp, heroes)}</b>"]
+    for g in sorted(mvp.games, key=lambda g: g.match_index):
+        parts = [f"{FANTASY_ITEMS[k][0]} {v:.1f}" for k, v in sorted(g.fantasy.items(), key=lambda kv: -kv[1]) if v > 0]
+        lines.append(f"#{g.match_index} {_hero(heroes, g.hero_id)} · {_position(g)} → {sum(g.fantasy.values()):.1f} очк.: "
+                     + ", ".join(parts))
     return _fit("\n".join(lines))
 
 

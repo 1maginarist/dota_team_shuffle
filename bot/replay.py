@@ -25,7 +25,9 @@ ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 BZ2_MAGIC = b"BZh"
 DEM_MAGIC = b"PBDEMS2"
 REPLAY_SUFFIXES = (".dem", ".dem.bz2", ".dem.zst", ".bz2", ".zst")
-LANE_PHASE = (60, 600)  # секунды игры, по которым определяем линию
+LANE_PHASE = (60, 600)
+# Меняется, когда в разобранных данных появляются новые поля — старый кэш разбираем заново.
+PARSED_FORMAT = 2  # секунды игры, по которым определяем линию
 
 # поле benchmarks OpenDota → как посчитать «сырое» значение
 BENCHMARK_FIELDS = (
@@ -200,6 +202,10 @@ class Aggregator:
                 "observer_kills": dewards["obs"][slot],
                 "sentry_kills": dewards["sen"][slot],
                 "camps_stacked": e.get("camps_stacked", 0),
+                "towers_killed": e.get("towers_killed", 0),
+                "roshans_killed": e.get("roshans_killed", 0),
+                "rune_pickups": e.get("rune_pickups", 0),
+                "firstblood_claimed": e.get("firstblood_claimed", 0),
                 "stuns": e.get("stuns", 0.0),
                 "teamfight_participation": e.get("teamfight_participation", 0.0),
                 "damage_taken": dict(taken[slot]),
@@ -214,6 +220,7 @@ class Aggregator:
             "duration": int(duration),
             "radiant_win": radiant_win,
             "version": "replay",  # данные из разобранного реплея
+            "parsed_format": PARSED_FORMAT,
             "players": players,
         }
 
@@ -306,9 +313,12 @@ async def load_local(match_id: int, folder: Path, parser_url: str, opendota) -> 
     if path is None:
         return None
     cache = folder / "parsed" / f"{match_id}.json"
+    match = None
     if cache.is_file() and cache.stat().st_mtime >= path.stat().st_mtime:
         match = json.loads(cache.read_text())
-    else:
+        if match.get("parsed_format") != PARSED_FORMAT:
+            match = None  # кэш старого формата — разбираем заново
+    if match is None:
         tmp = folder / "parsed" / f"{match_id}.tmp.dem"
         tmp.parent.mkdir(parents=True, exist_ok=True)
         try:

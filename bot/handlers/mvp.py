@@ -105,5 +105,7 @@ async def cmd_mvp(message: Message, command: CommandObject, config: Config, open
     except OpenDotaError:
         heroes = {}
     result = compute_mvp(matches)
+    alternative = compute_mvp(matches, formula="fantasy")
     await status.edit_text(mvp_texts.summary(result, heroes, warnings), link_preview_options=NO_PREVIEW)
     await message.answer(mvp_texts.breakdown(result, heroes), link_preview_options=NO_PREVIEW)
+    await message.answer(mvp_texts.fantasy(alternative, heroes, result.mvp.key), link_preview_options=NO_PREVIEW)

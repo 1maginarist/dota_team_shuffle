@@ -311,11 +311,12 @@ def test_mvp_command(monkeypatch):
             assert fake.parse_requests == [9077267013, 123456789]
             texts = [c.text for c in h.session.calls if isinstance(c, (SendMessage, EditMessageText)) and c.chat_id == 1]
             assert any("разбираю реплей" in t for t in texts)
-            summary, details = texts[-2], texts[-1]
+            summary, details = texts[-3], texts[-2]
             assert "MVP вечера" in summary
             assert "Матч 123456789 не найден" in summary
             assert "без разбора" not in summary  # третий матч дождались
             assert "Разбор лидеров" in details
+            assert "фэнтези-очки Valve" in texts[-1]
         finally:
             await h.db.close()
 
